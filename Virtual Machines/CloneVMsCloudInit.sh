@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # This script automates the process of cloning virtual machines (VMs) within a Proxmox VE environment. It clones a source VM into
-# a specified number of new VMs, assigning them unique IDs, names based on a user-provided base name, and assignes cloud-init IP addresses. 
+# a specified number of new VMs, assigning them unique IDs, names based on a user-provided base name, and assigns cloud-init IP addresses. 
 # Adding cloned VMs to a designated pool is optional. This script is particularly useful for quickly deploying multiple VMs based on a 
 # standardized configuration.
 #
 # Usage:
-# ./CloneVMs.sh <source_vm_id> <base_vm_name> <start_vm_id> <num_vms> <start_ip/cidr> [gateway] [pool_name]
+# ./CloneVMs.sh <source_vm_id> <base_vm_name> <start_vm_id> <num_vms> <start_ip/cidr> <bridge> [gateway] [pool_name]
 #
 # Arguments:
 #   source_vm_id - The ID of the VM that will be cloned.
@@ -14,16 +14,17 @@
 #   start_vm_id - The starting VM ID for the first clone.
 #   num_vms - The number of VMs to clone.
 #   start_ip/cidr - The new IP address and subnet mask of the VM
-#   gateway - The gateway for the IP configuration
+#   bridge - The network bridge to be used for the cloned VMs.
+#   gateway - Optional. The gateway for the IP configuration
 #   pool_name - Optional. The name of the pool to which the new VMs will be added. If not provided, VMs are not added to any pool.
 #
 # Example:
-#   ./CloneVMs.sh 110 Ubuntu-2C-20GB 400 30 192.168.1.50/24 192.168.1.1 PoolName
-#   ./CloneVMs.sh 110 Ubuntu-2C-20GB 400 30 192.168.1.50/24 # Without specifying a gateway or pool
+#   ./CloneVMs.sh 110 Ubuntu-2C-20GB 400 30 192.168.1.50/24 vmbr0 192.168.1.1 PoolName
+#   ./CloneVMs.sh 110 Ubuntu-2C-20GB 400 30 192.168.1.50/24 vmbr0 # Without specifying a gateway or pool
 
 # Check if the minimum required parameters are provided
 if [ "$#" -lt 6 ]; then
-    echo "Usage: $0 <source_vm_id> <base_vm_name> <start_vm_id> <num_vms> <start_ip/cidr> [gateway] [pool_name]"
+    echo "Usage: $0 <source_vm_id> <base_vm_name> <start_vm_id> <num_vms> <start_ip/cidr> <bridge> [gateway] [pool_name]"
     exit 1
 fi
 
@@ -33,8 +34,9 @@ BASE_VM_NAME=$2
 START_VM_ID=$3
 NUM_VMS=$4
 START_IP_CIDR=$5
-GATEWAY=${6:-}  # Optional gateway, default to an empty string if not provided
-POOL_NAME=${7:-}  # Optional pool name, default to an empty string if not provided
+BRIDGE=$6  # Network bridge, required
+GATEWAY=${7:-}  # Optional gateway, default to an empty string if not provided
+POOL_NAME=${8:-}  # Optional pool name, default to an empty string if not provided
 
 # Extract the IP address and CIDR from the start_ip/cidr
 IFS='/' read -r START_IP SUBNET_MASK <<< "$START_IP_CIDR"
@@ -49,7 +51,7 @@ ip_to_int() {
 # Convert integer to IP address
 int_to_ip() {
     local ip
-    ip=$(printf "%d.%d.%d.%d" "$((($1 >> 24) & 255))" "$((($1 >> 16) & 255))" "$((($1 >> 8) & 255))" "$(($1 & 255))")
+    ip=$(printf "%d.%d.%d.%d" "$((($1 >> 24) & 255))" "$((($1 >> 16) & 255))" "$((($1 >> 8) & 255))" "$((($1 & 255))")
     echo "$ip"
 }
 
@@ -72,10 +74,14 @@ for (( i=0; i<$NUM_VMS; i++ )); do
     # Set the static IP, subnet mask, and gateway using Cloud-Init
     qm set $TARGET_VM_ID --ipconfig0 ip=${NEW_IP}/${SUBNET_MASK},gw=${GATEWAY}
 
+    # Set the network bridge
+    qm set $TARGET_VM_ID --net0 virtio,bridge=$BRIDGE
+
     # Check if a pool name was provided and add VM to the pool if it was
     if [ -n "$POOL_NAME" ]; then
         qm set $TARGET_VM_ID --pool $POOL_NAME
     fi
+
 done
 
 echo "Cloning completed!"
