@@ -6,7 +6,7 @@
 # based on a standardized configuration.
 #
 # Usage:
-# ./CloneLXCs.sh <source_ct_id> <base_ct_name> <start_ct_id> <num_cts> <start_ip/cidr> <bridge> [gateway] [pool_name]
+# ./CloneLXC.sh <source_ct_id> <base_ct_name> <start_ct_id> <num_cts> <start_ip/cidr> <bridge> [gateway] [pool_name]
 #
 # Arguments:
 #   source_ct_id - The ID of the LXC container that will be cloned.
@@ -19,8 +19,8 @@
 #   pool_name - Optional. The name of the pool to which the new containers will be added. If not provided, containers are not added to any pool.
 #
 # Example:
-#   ./CloneLXCs.sh 110 Ubuntu-2C-20GB 400 30 192.168.1.50/24 vmbr0 192.168.1.1 PoolName
-#   ./CloneLXCs.sh 110 Ubuntu-2C-20GB 400 30 192.168.1.50/24 vmbr0 # Without specifying a gateway or pool
+#   ./CloneLXC.sh 110 Ubuntu-2C-20GB 400 30 192.168.1.50/24 vmbr0 192.168.1.1 PoolName
+#   ./CloneLXC.sh 110 Ubuntu-2C-20GB 400 30 192.168.1.50/24 vmbr0 # Without specifying a gateway or pool
 
 # Check if the minimum required parameters are provided
 if [ "$#" -lt 6 ]; then

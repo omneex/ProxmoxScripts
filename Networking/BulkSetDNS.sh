@@ -3,7 +3,7 @@
 # This script sets the DNS servers and search domain for all nodes in the Proxmox VE cluster.
 #
 # Usage:
-# ./SetDNS.sh <dns_server_1> <dns_server_2> <search_domain>
+# ./BulkSetDNS.sh <dns_server_1> <dns_server_2> <search_domain>
 
 # Check if the required parameters are provided
 if [ "$#" -ne 3 ]; then

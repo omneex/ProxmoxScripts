@@ -3,7 +3,7 @@
 # This script disables high availability (HA) for the Proxmox VE cluster if only one or two nodes are available in the cluster.
 #
 # Usage:
-# ./DisableHAIfFewNodes.sh
+# ./BulkDisableHighAvailability.sh
 
 # Get the number of nodes in the cluster
 NODE_COUNT=$(pvecm nodes | awk 'NR>1' | wc -l)

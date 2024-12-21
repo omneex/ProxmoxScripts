@@ -4,7 +4,7 @@
 # Ceph, and system logs. It provides a succinct summary to quickly diagnose any issues with the system.
 #
 # Usage:
-# ./CheckSystemErrors.sh
+# ./QuickDiagnostic.sh
 
 # Function to check storage errors and usage
 check_storage_errors() {

@@ -3,7 +3,7 @@
 # This script enables microcode updates for all nodes in a Proxmox VE cluster.
 #
 # Usage:
-# ./EnableMicrocodeOnAllNodes.sh
+# ./ProxmoxEnableMicrocode.sh
 
 # Function to enable microcode updates
 enable_microcode() {
