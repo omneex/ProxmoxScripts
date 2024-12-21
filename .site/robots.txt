@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /proxmoxscripts/
+
+Sitemap: https://coelacant.com/proxmoxscripts/sitemap.xml
