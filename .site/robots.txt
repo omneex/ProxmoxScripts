@@ -1,4 +1,4 @@
 User-agent: *
-Allow: /proxmoxscripts/
+Allow: /ProxmoxScripts/
 
-Sitemap: https://coelacant.com/proxmoxscripts/sitemap.xml
+Sitemap: https://coelacant.com/ProxmoxScripts/sitemap.xml
