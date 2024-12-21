@@ -14,7 +14,21 @@ const content = document.getElementById('content');
 
 // Format .sh name => "Bulk Add IP Note to V Ms", etc.
 function formatFileName(fileName) {
-  return fileName.replace('.sh', '').replace(/([A-Z])/g, ' $1').trim();
+  return fileName
+    .replace(/\.sh$/i, '') // Remove the .sh extension (case-insensitive)
+    // Insert space between a lowercase letter or number and an uppercase letter
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    // Insert space between consecutive uppercase letters followed by a lowercase letter
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    // Insert space between a lowercase letter and a number, if needed
+    .replace(/([a-zA-Z])([0-9])/g, '$1 $2')
+    // Insert space between a number and a lowercase letter, if needed
+    .replace(/([0-9])([a-z])/g, '$1 $2')
+    .replace(/\bV Ms\b/g, 'VMs') // Special case: "V Ms" becomes "VMs"
+    .replace(/\bIS Os\b/g, 'ISOs') // Special case
+    .replace(/\bOS Ds\b/g, 'OSDs') // Special case
+    .replace(/\bTTYS 0\b/g, 'TTYS0') // Special case
+    .trim();
 }
 
 // Parse the top comment block from script content
@@ -30,7 +44,7 @@ function parseTopComment(content) {
       continue;
     } else if (line.startsWith('#')) {
       inCommentBlock = true;
-      commentBlock.push(line.replace(/^#\s*/, '').trim());
+      commentBlock.push(line.replace(/^\s*/, '').trim());
     } else if (inCommentBlock) {
       break; // stop at first non-comment line after comments
     }
@@ -111,120 +125,185 @@ function createScriptBlock(folder, file) {
   // Determine raw GitHub URL
   const filePath = folder ? `${folder}/${file}` : file;
   const fileURL = `${baseRawURL}/${filePath}`;
-  const command = `bash -c "$(wget -qLO - ${fileURL})"`;
+  const command = `bash -c "$(wget -qLO - https://github.com/${repoOwner}/${repoName}/raw/main/${filePath})"`;
   const formattedName = formatFileName(file);
 
-  // Unique IDs for .info-button and .script-button sections
+  // Unique IDs for info and full script sections
   const infoId = `info-${filePath.replace(/[\/.]/g, '-')}`;
   const fullScriptId = `full-${filePath.replace(/[\/.]/g, '-')}`;
 
-  // Create container
-  const container = document.createElement('div');
-  container.classList.add('file-block');
+  // Create table container
+  const table = document.createElement('table');
+  table.classList.add('file-block-table'); // Add a specific class for styling
 
-  // Build inner HTML
-  container.innerHTML = `
-    <pre>
-      <span class="file-name">${formattedName}</span>
-      <code>${command}</code>
-      <div class="file-footer">
+  // Construct table rows
+  table.innerHTML = `
+    <tr>
+      <td class="file-name-cell">${formattedName}</td>
+      <td class="buttons-cell">
         <button class="copy-button">Copy Command</button>
         <button class="info-button">Show Info</button>
         <button class="script-button">Show Full Script</button>
-      </div>
-      <div class="file-info hidden" id="${infoId}"></div>
-      <div class="full-script hidden" id="${fullScriptId}"></div>
-    </pre>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="3" class="script-command-cell">
+        <pre><code class="language-bash">${command}</code></pre>
+        <div class="file-info hidden" id="${infoId}"></div>
+        <div class="full-script hidden" id="${fullScriptId}"></div>
+      </td>
+    </tr>
   `;
 
-  // Attach direct event listeners for each button
-  const copyBtn = container.querySelector('.copy-button');
-  const infoBtn = container.querySelector('.info-button');
-  const scriptBtn = container.querySelector('.script-button');
-  const infoDiv = container.querySelector(`#${infoId}`);
-  const fullDiv = container.querySelector(`#${fullScriptId}`);
+  // Attach event listeners for buttons
+  const copyBtn = table.querySelector('.copy-button');
+  const infoBtn = table.querySelector('.info-button');
+  const scriptBtn = table.querySelector('.script-button');
+  const infoDiv = table.querySelector(`#${infoId}`);
+  const fullDiv = table.querySelector(`#${fullScriptId}`);
 
-  // 1) Copy Command Logic
-  copyBtn.addEventListener('click', () => {
-    console.log('[DEBUG] Copy button clicked:', command);
-    navigator.clipboard.writeText(command);
+copyBtn.addEventListener('click', () => {
+  console.log('[DEBUG] Copy button clicked:', command);
+
+  // Find the <code> element within the same container
+  const codeBlock = copyBtn.closest('.file-block-table').querySelector('code');
+
+  // Copy the command to the clipboard
+  navigator.clipboard.writeText(command).then(() => {
+    // Provide feedback on the button
     copyBtn.textContent = 'Copied!';
-    setTimeout(() => (copyBtn.textContent = 'Copy Command'), 2000);
-  });
+    copyBtn.classList.add('copied');
 
-  // 2) Show/Hide Info
-  infoBtn.addEventListener('click', async () => {
-    const isHidden = infoDiv.classList.contains('hidden');
-    console.log(`[DEBUG] Info button clicked. isHidden=${isHidden}`);
-    if (isHidden) {
-      // Show info
-      infoBtn.textContent = 'Hide Info';
-      infoDiv.classList.remove('hidden');
+    // Add highlight animation to the code block
+    if (codeBlock) {
+      codeBlock.classList.add('code-highlight');
 
-      // Only fetch if not already loaded
-      if (!infoDiv.textContent.trim()) {
-        const topComment = await fetchTopComment(filePath);
-        infoDiv.textContent = topComment;
-      }
-    } else {
-      // Hide info
-      infoBtn.textContent = 'Show Info';
-      infoDiv.classList.add('hidden');
+      // Remove the highlight class after the animation ends
+      setTimeout(() => {
+        codeBlock.classList.remove('code-highlight');
+        copyBtn.textContent = 'Copy Command';
+        copyBtn.classList.remove('copied');
+      }, 1000); // Match the duration of the animation
     }
+  }).catch((err) => {
+    console.error('Failed to copy text:', err);
+    copyBtn.textContent = 'Error!';
+    setTimeout(() => {
+      copyBtn.textContent = 'Copy Command';
+      copyBtn.classList.remove('copied');
+    }, 2000);
   });
+});
+  
 
-  // 3) Show/Hide Full Script
-  scriptBtn.addEventListener('click', async () => {
-    const isHidden = fullDiv.classList.contains('hidden');
-    console.log(`[DEBUG] Full script button clicked. isHidden=${isHidden}`);
-    if (isHidden) {
-      // Show script
-      scriptBtn.textContent = 'Hide Full Script';
-      fullDiv.classList.remove('hidden');
+// Inside the Show/Hide Info button event listener
+infoBtn.addEventListener('click', async () => {
+  const isHidden = infoDiv.classList.contains('hidden');
+  console.log(`[DEBUG] Info button clicked. isHidden=${isHidden}`);
+  if (isHidden) {
+    // Show info
+    infoBtn.textContent = 'Hide Info';
+    infoBtn.setAttribute('aria-expanded', 'true');
+    infoDiv.classList.remove('hidden');
 
-      // Only fetch if not already loaded
-      if (!fullDiv.textContent.trim()) {
-        const content = await fetchFullScript(filePath);
-        // Prism highlight
-        const highlighted = Prism.highlight(content, Prism.languages.bash, 'bash');
-        fullDiv.innerHTML = `<pre class="language-bash"><code class="language-bash">${highlighted}</code></pre>`;
-      }
-    } else {
-      // Hide script
-      scriptBtn.textContent = 'Show Full Script';
-      fullDiv.classList.add('hidden');
+    // Only fetch if not already loaded
+    if (!infoDiv.textContent.trim()) {
+      const content = await fetchTopComment(filePath);
+      
+      infoDiv.innerHTML = `<pre><code class="language-bash">${content}</code></pre>`;
+      // Apply Prism highlighting
+      Prism.highlightElement(infoDiv.querySelector('code'));
     }
-  });
+  } else {
+    // Hide info
+    infoBtn.textContent = 'Show Info';
+    infoBtn.setAttribute('aria-expanded', 'false');
+    infoDiv.classList.add('hidden');
+  }
+});
 
-  return container;
+// Similarly for the Show/Hide Full Script button
+scriptBtn.addEventListener('click', async () => {
+  const isHidden = fullDiv.classList.contains('hidden');
+  console.log(`[DEBUG] Full script button clicked. isHidden=${isHidden}`);
+  if (isHidden) {
+    // Show script
+    scriptBtn.textContent = 'Hide Full Script';
+    scriptBtn.setAttribute('aria-expanded', 'true');
+    fullDiv.classList.remove('hidden');
+
+    // Only fetch if not already loaded
+    if (!fullDiv.innerHTML.trim()) {
+      const content = await fetchFullScript(filePath);
+      fullDiv.innerHTML = `<pre><code class="language-bash">${content}</code></pre>`;
+      // Apply Prism highlighting
+      Prism.highlightElement(fullDiv.querySelector('code'));
+    }
+  } else {
+    // Hide script
+    scriptBtn.textContent = 'Show Full Script';
+    scriptBtn.setAttribute('aria-expanded', 'false');
+    fullDiv.classList.add('hidden');
+  }
+});
+
+
+  return table;
 }
+
 
 function createDownloadRepoBlock() {
     // Command to clone or download the repo
     const command = `git clone https://github.com/coelacant1/ProxmoxScripts.git`;
   
     // Create a container
-    const container = document.createElement('div');
-    container.classList.add('file-block'); // Reuse your .file-block styling if desired
-  
+    const container = document.createElement('table');
+    container.classList.add('file-block-table'); // Reuse your .file-block styling if desired
+
     // Set up the innerHTML with explicit block-level elements
     container.innerHTML = `
-      <div class="download-repo-title">Download Repository</div>
-      <div class="code-block">
-        <pre><code>${command}</code></pre>
-      </div>
-      <div class="file-footer">
-        <button class="copy-button">Copy Command</button>
-      </div>
+      <tr>
+        <td class="file-name-cell">Download Repository</td>
+        <td class="buttons-cell">
+          <button class="copy-button">Copy Command</button>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="3" class="script-command-cell">
+        <pre><code class="language-bash">${command}</code></pre>
+        </td>
+      </tr>
     `;
   
     // Attach a direct event listener for the copy button
-    const copyBtn = container.querySelector('.copy-button');
-    copyBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(command);
-      copyBtn.textContent = 'Copied!';
-      setTimeout(() => (copyBtn.textContent = 'Copy Command'), 2000);
+  const copyBtn = container.querySelector('.copy-button');
+  copyBtn.addEventListener('click', () => {
+    const codeBlock = container.querySelector('code'); // Find the <code> element inside the container
+    const command = codeBlock.textContent; // Get the text content of the <code> element
+
+    // Copy the command to the clipboard
+    navigator.clipboard.writeText(command).then(() => {
+        // Provide feedback on the button
+        copyBtn.textContent = 'Copied!';
+        copyBtn.classList.add('copied');
+
+        // Add highlight animation to the code block
+        codeBlock.classList.add('code-highlight');
+
+        // Remove highlight and reset button text after the animation ends
+        setTimeout(() => {
+            codeBlock.classList.remove('code-highlight');
+            copyBtn.textContent = 'Copy Command';
+            copyBtn.classList.remove('copied');
+        }, 1000); // Match the animation duration
+    }).catch((err) => {
+        console.error('Failed to copy text:', err);
+        copyBtn.textContent = 'Error!';
+        setTimeout(() => {
+            copyBtn.textContent = 'Copy Command';
+        }, 2000);
     });
+  });
   
     return container;
   }
@@ -247,11 +326,6 @@ async function fetchRepoStructure(path = '') {
   }
 }
 
-/**
- * Convert Markdown to HTML and run Prism on any code blocks
- * @param {string} markdown Raw README.md text
- * @returns {string} HTML string (already code-highlighted)
- */
 function parseMarkdownWithPrism(markdown) {
     // Convert Markdown to HTML (using Marked or your chosen Markdown parser)
     const html = marked.parse(markdown);
@@ -273,7 +347,7 @@ function parseMarkdownWithPrism(markdown) {
 async function showRepositoryReadme() {
 // This function is presumably called in `renderContent()` or similar
 const readmeContainer = document.createElement('div');
-readmeContainer.classList.add('file-info'); // or similar styling
+readmeContainer.classList.add('readme-container'); // or similar styling
 
 const readmeHTML = await getRepositoryReadmeHTML();
 readmeContainer.innerHTML = readmeHTML;  // directly set the HTML
@@ -313,17 +387,23 @@ async function renderContent(path = '') {
     list.appendChild(backItem);
   }
 
+  // List of scripts to exclude
+  const excludedScripts = ['MakeScriptsExecutable.sh', 'UpdateProxmoxScripts.sh'];
+
   // Populate folders/files
   for (const item of visibleItems) {
     if (item.type === 'dir') {
       // Folder
       const li = document.createElement('li');
-      li.innerHTML = `<a href="#" class="folder-link">${item.name}</a>`;
+      li.innerHTML = `<a href="#" class="folder-link">/${item.name}</a>`;
       li.querySelector('a').addEventListener('click', () => {
         renderContent(path ? `${path}/${item.name}` : item.name);
       });
       list.appendChild(li);
     } else if (item.type === 'file' && item.name.endsWith('.sh')) {
+      // Skip excluded scripts
+      if (excludedScripts.includes(item.name)) continue;
+
       // Script
       const li = document.createElement('li');
       const block = createScriptBlock(path, item.name);

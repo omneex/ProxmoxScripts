@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
-/* General Styles */
+/* =====================================================
+   General Styles
+   ===================================================== */
 body {
     font-family: 'Press Start 2P', cursive;
     margin: 0;
@@ -11,114 +13,6 @@ body {
     -webkit-font-smoothing: none; /* Disable font smoothing for WebKit browsers */
     -moz-osx-font-smoothing: grayscale; /* Grayscale rendering on macOS */
     text-rendering: geometricPrecision; /* Ensure pixel-perfect rendering */
-}
-
-/* Header Styles */
-header {
-    background: #27293d;
-    color: #4caf50;
-    text-align: center;
-    padding: 1.5em;
-    border-bottom: 2px solid #4caf50;
-}
-
-header h1 {
-    font-size: 1.5em;
-    margin: 0.5em 0;
-}
-
-header p {
-    margin: 0;
-    font-size: 0.9em;
-}
-
-/* Main Content Styles */
-main {
-    padding: 1.5em;
-}
-
-/* Folder and Back Link Styles */
-.folder {
-    margin: 1em 0;
-}
-
-.folder a {
-    color: #4caf50;
-    text-decoration: none;
-    font-weight: bold;
-    font-size: 1em;
-}
-
-.folder a:hover {
-    text-decoration: underline;
-}
-
-.folder ul {
-    margin-left: 1em;
-    padding-left: 1em;
-    border-left: 1px dashed #4caf50;
-}
-
-.back-link {
-    margin-top: 1em;
-    font-style: italic;
-}
-
-/* File Block Styles */
-.file-block {
-    background: #27293d;
-    color: #f4f4f9;
-    padding: 1em;
-    margin: 0.5em 0;
-    border: 1px solid #4caf50;
-    border-radius: 5px;
-    font-family: monospace;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.file-block pre {
-    margin: 0;
-    overflow: auto;
-    white-space: nowrap;
-    flex-grow: 1;
-    font-size: 0.8em;
-}
-
-/* Copy Button Styles */
-.copy-button {
-    background: #4caf50;
-    color: #1e1e2f;
-    border: none;
-    padding: 0.5em 1em;
-    cursor: pointer;
-    font-size: 0.8em;
-    border-radius: 5px;
-    margin-left: 1em;
-}
-
-.copy-button:hover {
-    background: #45a049;
-}
-
-.copy-button:active {
-    background: #3e903f;
-    transform: scale(0.95);
-}
-
-/* Loading and Error Styles */
-.loading {
-    text-align: center;
-    font-size: 1.2em;
-    color: #f4f4f9;
-    font-style: italic;
-}
-
-.error {
-    text-align: center;
-    font-size: 1.2em;
-    color: #ff4c4c;
 }
 
 /* Navigation List Styles */
@@ -132,35 +26,174 @@ li {
     margin: 0.5em 0;
 }
 
-.file-block {
+/* =====================================================
+   Header Styles
+   ===================================================== */
+header {
     background: #27293d;
-    color: #f4f4f9;
-    padding: 1em;
-    margin: 1em 0;
-    border: 1px solid #4caf50;
-    border-radius: 5px;
-    font-family: monospace;
-    position: relative;
+    color: #f8cbdd;
+    text-align: center;
+    padding: 1.5em;
+    border-bottom: 2px solid #f8cbdd;
 }
 
-.file-name {
+header h1 {
+    font-size: 1.5em;
+    margin: 0.5em 0;
+}
+
+header p {
+    margin: 0;
+    font-size: 0.9em;
+}
+
+/* =====================================================
+   Repository Link at the Top
+   ===================================================== */
+.repository-link {
+    text-align: center;
+    margin: 1em 0; /* Add spacing above and below the link */
+}
+
+.repository-link a {
+    font-size: 1.2rem; /* Slightly larger than body text */
     font-weight: bold;
-    color: #4caf50;
-    display: block;
-    margin-bottom: 0.5em;
+    color: #f8cbdd; /* Green to match the theme */
+    text-decoration: none;
+}
+
+.repository-link a:hover {
+    text-decoration: underline; /* Underline on hover for better visibility */
+    color: #ea7aaa; /* Slightly darker green on hover */
+}
+
+@keyframes pulsate-opacity {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+/* =====================================================
+   Folder link
+   ===================================================== */
+
+.folder-link:hover {
+    animation: pulsate-opacity 1.5s infinite;
+    text-decoration: underline;
+}
+
+.folder-link {
+    text-align: center;
+    margin: 1em 0; /* Add spacing above and below the link */
+    color: #f8cbdd; /* Green to match the theme */
+}
+
+/* =====================================================
+   Main Content Styles
+   ===================================================== */
+main {
+    padding: 1.5em;
+}
+
+/* =====================================================
+   Folder and Back Link Styles
+   ===================================================== */
+/* Remove default list styles for all lists within folders */
+.folder ul {
+    list-style: none; /* Removes bullets */
+    padding-left: 1em;
+    margin: 0.5em 0;
+    border-left: 1px dashed #f8cbdd;
+}
+
+.folder a {
+    color: #f8cbdd;
+    text-decoration: none;
+    font-weight: bold;
     font-size: 1em;
 }
 
-.file-footer {
-    margin-top: 1em;
-    display: flex;
-    gap: 1em;
+.folder a:hover {
+    text-decoration: underline;
 }
 
-.copy-button,
-.info-button,
-.script-button {
-    background: #4caf50;
+.back-link {
+    margin-top: 1em;
+    font-style: italic;
+    color: #f8cbdd;
+}
+
+.back-link a {
+    color: #f8cbdd;
+    text-decoration: none;
+}
+
+.back-link a:hover {
+    text-decoration: underline;
+}
+
+/* =====================================================
+   File Block Table Styles
+   ===================================================== */
+.file-block-table {
+    width: 100%;
+    border-collapse: separate; /* Allows border-radius to work */
+    border-spacing: 0;
+    margin-top: 1.0em; /* Space between blocks */
+    margin-bottom: 1.0em; /* Space between blocks */
+    border: 1px solid #f8cbdd; /* Thin green border around the table */
+    border-radius: 5px; /* Rounded corners for the table */
+    overflow: hidden; /* Ensures border-radius is applied */
+    background: #27293d; /* Match background color */
+}
+
+/* Apply rounded corners to the first and last rows */
+.file-block-table tr:first-child td:first-child {
+    border-top-left-radius: 5px;
+}
+
+.file-block-table tr:first-child td:last-child {
+    border-top-right-radius: 5px;
+}
+
+.file-block-table tr:last-child td:first-child {
+    border-bottom-left-radius: 5px;
+}
+
+.file-block-table tr:last-child td:last-child {
+    border-bottom-right-radius: 5px;
+}
+
+/* First row: Name and Buttons */
+.file-block-table .file-name-cell {
+    font-size: 1.2rem;
+    color: #f8cbdd; /* Green color for the name */
+    font-weight: bold;
+    padding: 0.5em;
+    vertical-align: middle;
+    border-bottom: 1px solid #f8cbdd; /* Separator line */
+}
+
+.file-block-table .spacer-cell {
+    width: 10%; /* Adjust as needed */
+    border-bottom: 1px solid #f8cbdd; /* Separator line */
+}
+
+.file-block-table .buttons-cell {
+    text-align: right;
+    padding: 0.5em;
+    border-bottom: 1px solid #f8cbdd; /* Separator line */
+}
+
+.file-block-table .buttons-cell button {
+    margin-left: 0.5em; /* Space between buttons */
+    background: #f8cbdd;
     color: #1e1e2f;
     border: none;
     padding: 0.5em 1em;
@@ -168,71 +201,268 @@ li {
     font-size: 0.8em;
     border-radius: 5px;
     text-align: center;
+    transition: background 0.3s, transform 0.1s;
+}
+
+.file-block-table .buttons-cell button:hover {
+    background: #ea7aaa;
+}
+
+.file-block-table .buttons-cell button:active {
+    background: #bc6b8f;
+    transform: scale(0.95);
+}
+
+.copy-button.copied,
+.info-button.active,
+.script-button.active {
+    background: #ea7aaa;
+    color: #ffffff;
+}
+
+/* Script command row */
+.file-block-table .script-command-cell {
+    padding: 0.5em;
+    background: #2e2e3e; /* Slightly different background for distinction */
+}
+
+.file-block-table .script-command-cell pre {
+    margin: 0; /* Remove default margin */
+    padding: 0.5em;
+    background: #27293d; /* Match your existing code block background */
+    border-radius: 5px; /* Rounded corners */
+    white-space: pre-wrap; /* Allow wrapping if necessary */
+    font-family: monospace; /* Ensure consistent code font */
+    color: #f4f4f9; /* Text color */
+}
+
+/* Ensure the tbody is the target for animation */
+.file-block-table tbody {
+    transition: opacity 0.3s ease; /* Smooth transition effect */
+    opacity: 0.7;
+}
+
+/* Change opacity on hover */
+.file-block-table:hover tbody {
+    opacity: 1.0; /* Adjust to the desired level (e.g., 70%) */
+}
+
+
+/* =====================================================
+   Buttons Styling
+   ===================================================== */
+/* Copy, Info, and Script Buttons */
+.copy-button,
+.info-button,
+.script-button {
+    background: #f8cbdd;
+    color: #1e1e2f;
+    border: none;
+    padding: 0.5em 1em;
+    cursor: pointer;
+    font-size: 0.8em;
+    border-radius: 5px;
+    text-align: center;
+    transition: background 0.3s, transform 0.1s;
 }
 
 .copy-button:hover,
 .info-button:hover,
 .script-button:hover {
-    background: #45a049;
+    background: #ea7aaa;
 }
 
-.file-info {
-    
-    font-family: monospace;
-    background: #2e2e3e; /* Darker grey background */
-    color: #f4f4f9;
-    padding: 1em;
-    margin-top: 0.5em;
-    border-top: 1px solid #4caf50;
-    white-space: pre-wrap;
-    font-size: 0.8rem;
-    border-radius: 5px;
-    line-height: 1.0;  /* Optional: tweak line-height for readability */
+.copy-button:active,
+.info-button:active,
+.script-button:active {
+    background: #bc6b8f;
+    transform: scale(0.95);
 }
 
+.copy-button.copied,
+.info-button.active,
+.script-button.active {
+    background: #ea7aaa;
+    color: #ffffff;
+}
+
+/* =====================================================
+   Info and Full Script Divs
+   ===================================================== */
+.file-info,
 .full-script {
-    background: #1e1e2f; /* Darker background for the full script */
-    color: #f4f4f9;
-    padding: 1em;
     margin-top: 0.5em;
-    border-top: 1px solid #4caf50;
+    background: #2e2e3e;
+    border-radius: 5px; /* Rounded corners */
+    font-size: 0.8rem; /* Reduced font size */
+    line-height: 1.2; /* Reduced line spacing */
     white-space: pre-wrap;
-    font-size: 0.9em;
-    border-radius: 5px;
-    overflow-x: auto; /* Horizontal scrolling for long lines */
+    font-family: monospace;
+    color: #f4f4f9;
 }
 
+.file-info p,
+.full-script p {
+    margin: 0.3em 0;
+}
+
+.file-info pre,
+.full-script pre {
+    margin: 0.5em 0;
+    padding: 1em;
+    background: #27293d;
+    border-radius: 5px; /* Rounded corners */
+    white-space: pre-wrap;
+    font-family: monospace;
+    color: inherit; /* Let Prism handle the coloring */
+}
+
+/* =====================================================
+   Hidden Class
+   ===================================================== */
+.hidden {
+    display: none;
+}
+
+/* =====================================================
+   Readme Container Styles
+   ===================================================== */
 .readme-container {
     font-family: monospace;
     font-size: 0.8rem;
-    line-height: 1.4;
+    line-height: 1.2;
+    background: #2e2e3e;
+    padding-left: 1em;
+    padding-right: 1em;
+    padding-bottom: 1em;
+    border: 1px solid #f8cbdd; /* Thin green border */
+    border-radius: 5px; /* Rounded corners */
+    margin-top: 1.5em;
+    color: #f4f4f9;
 }
 
-.download-repo-title {
-    font-size: 1.5rem; /* Adjust size as needed */
-    color: #4caf50; /* Green color */
-    font-weight: bold;
-    margin-bottom: 0.5em; /* Add spacing below the title */
-  }
-  
-  /* Style the code block */
-  .code-block {
-    
+.readme-container h1,
+.readme-container h2,
+.readme-container h3,
+.readme-container h4,
+.readme-container h5,
+.readme-container h6 {
+    color: #f8cbdd; /* Green color for headers */
+    border-bottom: 2px solid #f8cbdd; /* Line split below the header */
+    padding-bottom: 0.2em; /* Add space between the header text and the line */
+    margin-bottom: 0.5em; /* Add spacing below headers */
+}
+
+.readme-container h1 {
+    font-size: 1.8rem; /* Larger size for h1 */
+}
+
+.readme-container h2 {
+    font-size: 1.5rem; /* Slightly smaller for h2 */
+}
+
+.readme-container h3 {
+    font-size: 1.2rem; /* Smaller for h3 */
+}
+
+.readme-container h4, 
+.readme-container h5, 
+.readme-container h6 {
+    font-size: 1rem; /* Uniform smaller sizes for h4-h6 */
+}
+
+/* Optional: Adjust the overall spacing in the readme container */
+.readme-container p,
+.readme-container li {
+    line-height: 1.4; /* Adjust line height for readability */
+    margin-bottom: 0.5em; /* Add spacing between paragraphs and list items */
+}
+
+.readme-container a {
+    color: #f8cbdd; /* Green color for links */
+    text-decoration: none; /* Remove underline for cleaner look */
+    font-weight: bold; /* Optional: Make links bold for emphasis */
+}
+
+.readme-container a:hover {
+    text-decoration: underline; /* Underline on hover for visibility */
+    color: #bc6b8f; /* Lighter green on hover */
+}
+
+
+/* =====================================================
+   Code Block Styles
+   ===================================================== */
+@keyframes highlight {
+    0% {
+        background-color: #f8cbdd; /* Highlight green */
+        color: #1e1e2f; /* Dark text for contrast */
+    }
+    100% {
+        background-color: transparent; /* Reset background */
+        color: inherit; /* Reset text color */
+    }
+}
+
+.code-highlight {
+    animation: highlight 1s ease-in-out;
+}
+
+
+.code-block {
+    margin-bottom: 1em; /* Spacing between code block and button */
+}
+
+.code-block pre {
+    background: #27293d;
+    padding: 0.5em;
+    border: 1px solid #f8cbdd; /* Thin green border */
+    border-radius: 5px; /* Rounded corners */
+    white-space: pre-wrap;
     font-family: monospace;
-    margin-bottom: 1em; /* Add spacing between the code block and the Copy button */
-  }
-  
-  .code-block pre {
-    
-    font-family: monospace;
-    background: #27293d; /* Match your existing code block background */
-    padding: 0.5em; /* Inner padding for better readability */
-    border-radius: 5px; /* Optional: Rounded corners */
-    white-space: pre-wrap; /* Allow wrapping if necessary */
-    font-family: monospace; /* Ensure consistent code font */
-    color: #f4f4f9; /* Text color */
-  }
-  
-.hidden {
-    display: none;
+    color: #f4f4f9;
+}
+
+/* =====================================================
+   Additional Enhancements
+   ===================================================== */
+/* Responsive Design */
+@media (max-width: 768px) {
+    .file-block-table {
+        display: block;
+    }
+
+    .file-block-table tr {
+        display: block;
+        margin-bottom: 1em;
+    }
+
+    .file-block-table .file-name-cell,
+    .file-block-table .spacer-cell,
+    .file-block-table .buttons-cell,
+    .file-block-table .script-command-cell {
+        display: block;
+        width: 100%;
+    }
+
+    .file-block-table .buttons-cell {
+        text-align: left;
+    }
+
+    .file-block-table .buttons-cell button {
+        margin-left: 0;
+        margin-right: 0.5em;
+        margin-bottom: 0.5em;
+    }
+
+    .file-block-table .script-command-cell {
+        margin-top: 1em;
+    }
+}
+
+/* Accessibility Enhancements */
+/* Ensure focus outlines are visible */
+button:focus {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
 }
