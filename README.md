@@ -2,6 +2,9 @@
 
 This repository is dedicated to providing automation scripts for managing Proxmox VE (Virtual Environment) systems efficiently. The scripts are designed for system administrators and DevOps professionals who need to streamline their Proxmox operations.
 
+Explore the scripts for Proxmox VE management on the website:
+[Visit the Proxmox VE One-Click Scripts Website](https://coelacant1.github.io/ProxmoxScripts/)
+
 ## Getting Started
 
 These instructions will guide you on how to clone this repository and start using the scripts on your Proxmox server for development, testing, or production purposes.

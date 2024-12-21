@@ -1,0 +1,238 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+/* General Styles */
+body {
+    font-family: 'Press Start 2P', cursive;
+    margin: 0;
+    padding: 0;
+    background-color: #1e1e2f;
+    color: #f4f4f9;
+    line-height: 1.5;
+    -webkit-font-smoothing: none; /* Disable font smoothing for WebKit browsers */
+    -moz-osx-font-smoothing: grayscale; /* Grayscale rendering on macOS */
+    text-rendering: geometricPrecision; /* Ensure pixel-perfect rendering */
+}
+
+/* Header Styles */
+header {
+    background: #27293d;
+    color: #4caf50;
+    text-align: center;
+    padding: 1.5em;
+    border-bottom: 2px solid #4caf50;
+}
+
+header h1 {
+    font-size: 1.5em;
+    margin: 0.5em 0;
+}
+
+header p {
+    margin: 0;
+    font-size: 0.9em;
+}
+
+/* Main Content Styles */
+main {
+    padding: 1.5em;
+}
+
+/* Folder and Back Link Styles */
+.folder {
+    margin: 1em 0;
+}
+
+.folder a {
+    color: #4caf50;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1em;
+}
+
+.folder a:hover {
+    text-decoration: underline;
+}
+
+.folder ul {
+    margin-left: 1em;
+    padding-left: 1em;
+    border-left: 1px dashed #4caf50;
+}
+
+.back-link {
+    margin-top: 1em;
+    font-style: italic;
+}
+
+/* File Block Styles */
+.file-block {
+    background: #27293d;
+    color: #f4f4f9;
+    padding: 1em;
+    margin: 0.5em 0;
+    border: 1px solid #4caf50;
+    border-radius: 5px;
+    font-family: monospace;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.file-block pre {
+    margin: 0;
+    overflow: auto;
+    white-space: nowrap;
+    flex-grow: 1;
+    font-size: 0.8em;
+}
+
+/* Copy Button Styles */
+.copy-button {
+    background: #4caf50;
+    color: #1e1e2f;
+    border: none;
+    padding: 0.5em 1em;
+    cursor: pointer;
+    font-size: 0.8em;
+    border-radius: 5px;
+    margin-left: 1em;
+}
+
+.copy-button:hover {
+    background: #45a049;
+}
+
+.copy-button:active {
+    background: #3e903f;
+    transform: scale(0.95);
+}
+
+/* Loading and Error Styles */
+.loading {
+    text-align: center;
+    font-size: 1.2em;
+    color: #f4f4f9;
+    font-style: italic;
+}
+
+.error {
+    text-align: center;
+    font-size: 1.2em;
+    color: #ff4c4c;
+}
+
+/* Navigation List Styles */
+ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+li {
+    margin: 0.5em 0;
+}
+
+.file-block {
+    background: #27293d;
+    color: #f4f4f9;
+    padding: 1em;
+    margin: 1em 0;
+    border: 1px solid #4caf50;
+    border-radius: 5px;
+    font-family: monospace;
+    position: relative;
+}
+
+.file-name {
+    font-weight: bold;
+    color: #4caf50;
+    display: block;
+    margin-bottom: 0.5em;
+    font-size: 1em;
+}
+
+.file-footer {
+    margin-top: 1em;
+    display: flex;
+    gap: 1em;
+}
+
+.copy-button,
+.info-button,
+.script-button {
+    background: #4caf50;
+    color: #1e1e2f;
+    border: none;
+    padding: 0.5em 1em;
+    cursor: pointer;
+    font-size: 0.8em;
+    border-radius: 5px;
+    text-align: center;
+}
+
+.copy-button:hover,
+.info-button:hover,
+.script-button:hover {
+    background: #45a049;
+}
+
+.file-info {
+    
+    font-family: monospace;
+    background: #2e2e3e; /* Darker grey background */
+    color: #f4f4f9;
+    padding: 1em;
+    margin-top: 0.5em;
+    border-top: 1px solid #4caf50;
+    white-space: pre-wrap;
+    font-size: 0.8rem;
+    border-radius: 5px;
+    line-height: 1.0;  /* Optional: tweak line-height for readability */
+}
+
+.full-script {
+    background: #1e1e2f; /* Darker background for the full script */
+    color: #f4f4f9;
+    padding: 1em;
+    margin-top: 0.5em;
+    border-top: 1px solid #4caf50;
+    white-space: pre-wrap;
+    font-size: 0.9em;
+    border-radius: 5px;
+    overflow-x: auto; /* Horizontal scrolling for long lines */
+}
+
+.readme-container {
+    font-family: monospace;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.download-repo-title {
+    font-size: 1.5rem; /* Adjust size as needed */
+    color: #4caf50; /* Green color */
+    font-weight: bold;
+    margin-bottom: 0.5em; /* Add spacing below the title */
+  }
+  
+  /* Style the code block */
+  .code-block {
+    
+    font-family: monospace;
+    margin-bottom: 1em; /* Add spacing between the code block and the Copy button */
+  }
+  
+  .code-block pre {
+    
+    font-family: monospace;
+    background: #27293d; /* Match your existing code block background */
+    padding: 0.5em; /* Inner padding for better readability */
+    border-radius: 5px; /* Optional: Rounded corners */
+    white-space: pre-wrap; /* Allow wrapping if necessary */
+    font-family: monospace; /* Ensure consistent code font */
+    color: #f4f4f9; /* Text color */
+  }
+  
+.hidden {
+    display: none;
+}
