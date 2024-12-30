@@ -17,6 +17,22 @@ Before using these scripts, ensure you have the following:
 - Knowledge of Proxmox operations and Linux shell command execution.
 - You have read and understand what the scripts are doing on your system.
 
+### Single Line Usage
+
+To execute the single line call to navigate all scripts use:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/coelacant1/ProxmoxScripts/raw/main/CCPVE.sh)"
+```
+
+Requires:
+```bash
+apt update
+apt install wget unzip
+```
+
+![Single Line Command](.site/SingleLineCommand.png)
+
 ### Installation
 
 To execute these scripts on your system, follow these steps:
