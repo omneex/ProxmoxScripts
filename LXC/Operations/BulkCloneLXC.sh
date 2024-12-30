@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script automates the process of cloning LXC containers within a Proxmox VE environment. It clones a source LXC container into
 # a specified number of new containers, assigning them unique IDs, names based on a user-provided base name, and sets static IP addresses. 
 # Adding cloned containers to a designated pool is optional. This script is particularly useful for quickly deploying multiple containers 

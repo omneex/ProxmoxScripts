@@ -1,15 +1,22 @@
 #!/bin/bash
-
-# This script performs initial setup for a Proxmox VE cluster. It removes enterprise repositories,
-# enables free repositories, adds the latest Ceph enterprise repository, and disables the subscription nag for all nodes in the cluster.
+#
+# FirstTimeProxmoxSetup.sh
+#
+# This script performs initial setup for a Proxmox VE cluster:
+#   1. Removes enterprise repositories (both Proxmox and Ceph enterprise repos).
+#   2. Adds/Enables the free (no-subscription) repository, auto-detecting the correct
+#      Debian/Proxmox codename (e.g., buster, bullseye, bookworm).
+#   3. Disables the subscription nag for all nodes in the cluster.
 #
 # Usage:
-# ./FirstTimeProxmoxSetup.sh
+#   ./FirstTimeProxmoxSetup.sh
+#
 
-# Function to remove enterprise repository and add free repository
+# Function to remove enterprise repository and add the free repository
 setup_repositories() {
     echo "Setting up repositories on node: $(hostname)"
-    # Remove the enterprise repository
+
+    # Remove the enterprise repository if it exists
     if [ -f /etc/apt/sources.list.d/pve-enterprise.list ]; then
         rm /etc/apt/sources.list.d/pve-enterprise.list
         echo " - Removed enterprise repository."
@@ -17,21 +24,30 @@ setup_repositories() {
         echo " - Enterprise repository not found, skipping removal."
     fi
 
-    # Add the free repository if not already present
-    if ! grep -q "deb http://download.proxmox.com/debian/pve" /etc/apt/sources.list; then
-        echo "deb http://download.proxmox.com/debian/pve buster pve-no-subscription" >> /etc/apt/sources.list
-        echo " - Added free repository."
-    else
-        echo " - Free repository already present."
+    # Remove Ceph enterprise repository if it exists
+    if [ -f /etc/apt/sources.list.d/ceph-enterprise.list ]; then
+        rm /etc/apt/sources.list.d/ceph-enterprise.list
+        echo " - Removed Ceph enterprise repository."
     fi
 
-    # Add the latest Ceph enterprise repository if not already present
-    CEPH_RELEASE=$(curl -s https://docs.ceph.com/en/latest/releases/ | grep -oP 'href=".*?/"' | grep -oP '(?<=href=").*?(?=/")' | sort -V | tail -n 1)
-    if ! grep -q "deb https://enterprise.proxmox.com/debian/ceph-${CEPH_RELEASE}" /etc/apt/sources.list.d/ceph-enterprise.list 2>/dev/null; then
-        echo "deb https://enterprise.proxmox.com/debian/ceph-${CEPH_RELEASE} buster main" > /etc/apt/sources.list.d/ceph-enterprise.list
-        echo " - Added Ceph enterprise repository for release: ${CEPH_RELEASE}."
+    # Attempt to detect the codename from /etc/os-release
+    if [ -f /etc/os-release ]; then
+        # shellcheck source=/dev/null
+        . /etc/os-release
+        CODENAME="${VERSION_CODENAME:-bullseye}" # Default to 'bullseye' if not set
     else
-        echo " - Ceph enterprise repository already present for release: ${CEPH_RELEASE}."
+        echo " - /etc/os-release not found. Defaulting to 'bullseye'."
+        CODENAME="bullseye"
+    fi
+
+    echo " - Detected codename: ${CODENAME}"
+
+    # Check if the no-subscription repo is already in /etc/apt/sources.list
+    if ! grep -q "deb http://download.proxmox.com/debian/pve ${CODENAME} pve-no-subscription" /etc/apt/sources.list; then
+        echo "deb http://download.proxmox.com/debian/pve ${CODENAME} pve-no-subscription" >> /etc/apt/sources.list
+        echo " - Added Proxmox no-subscription repository for '${CODENAME}'."
+    else
+        echo " - Proxmox no-subscription repository already present."
     fi
 }
 
@@ -47,15 +63,15 @@ disable_subscription_nag() {
     fi
 }
 
-# Loop through all nodes in the cluster
+# Loop through all nodes in the cluster, applying the setup
 for NODE in $(pvecm nodes | awk 'NR>1 {print $2}'); do
     echo "Connecting to node: $NODE"
-    ssh root@$NODE "$(declare -f setup_repositories); setup_repositories"
-    ssh root@$NODE "$(declare -f disable_subscription_nag); disable_subscription_nag"
+    ssh root@"$NODE" "$(declare -f setup_repositories); setup_repositories"
+    ssh root@"$NODE" "$(declare -f disable_subscription_nag); disable_subscription_nag"
     echo " - Setup completed for node: $NODE"
 done
 
-# Update the local node
+# Apply the setup to the local node as well
 setup_repositories
 disable_subscription_nag
 

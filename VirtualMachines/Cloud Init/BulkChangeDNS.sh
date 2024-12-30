@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script updates the DNS search domain and DNS server for a range of virtual machines (VMs) within a Proxmox VE environment.
 # It allows you to set new DNS settings for each VM and regenerates the Cloud-Init image to apply the changes.
 #

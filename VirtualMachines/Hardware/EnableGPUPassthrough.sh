@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script automates the configuration of GPU passthrough on a Linux system (e.g., Proxmox). 
 # It adjusts various system configuration files to enable GPU passthrough based on the GPU type (NVIDIA or AMD) 
 # and the specific GPU IDs provided. The script modifies GRUB settings for IOMMU, blacklists conflicting drivers, 

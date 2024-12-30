@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script creates a High Availability (HA) group in the Proxmox VE cluster and adds the specified VMs to the group.
 #
 # Usage:

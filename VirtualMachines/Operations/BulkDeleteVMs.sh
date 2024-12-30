@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script is designed for batch management of virtual machines (VMs) on a Proxmox VE environment.
 # It takes a range of VM IDs and performs three actions: unprotects, stops, and destroys each VM in the range.
 # This script is useful for cleaning up VMs in a controlled manner, ensuring that all VMs within the specified

@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script enables execute permissions (chmod +x) on all scripts in the current folder and its subfolders.
 #
 # Usage:

@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script is designed to configure the 'min_size' parameter of a specified Ceph storage pool.
 # The 'min_size' parameter determines the minimum number of replicas that must be available for the 
 # cluster to allow read and write operations. Setting this to '1' allows the cluster to operate in 

@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script is used to configure the 'size' parameter of a specified Ceph storage pool.
 # The 'size' parameter defines the number of replicas Ceph maintains for objects in the pool,
 # setting this to '1' configures the pool to not use any data replication. This configuration 

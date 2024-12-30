@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script automates the process of cloning virtual machines (VMs) within a Proxmox VE environment. It clones a source VM into
 # a specified number of new VMs, assigning them unique IDs and names based on a user-provided base name. Adding cloned VMs to a
 # designated pool is optional. This script is particularly useful for quickly deploying multiple VMs based on a standardized configuration.

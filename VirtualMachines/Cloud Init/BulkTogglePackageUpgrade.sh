@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script enables or disables automatic package upgrades for a range of virtual machines (VMs) within a Proxmox VE environment.
 # It updates the Cloud-Init configuration for each VM to set or unset automatic package upgrades.
 #

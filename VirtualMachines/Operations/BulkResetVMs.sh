@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script resets a range of virtual machines (VMs) within a Proxmox VE environment.
 #
 # Usage:

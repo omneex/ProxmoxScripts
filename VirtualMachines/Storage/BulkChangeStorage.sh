@@ -1,19 +1,19 @@
 #!/bin/bash
-
+#
 # This script automates the process of updating the storage location specified in the configuration
 # files of virtual machines (VMs) on a Proxmox server. It is designed to bulk-update the storage
 # paths for a range of VM IDs from one storage location to another. This can be useful in scenarios
 # where VMs need to be moved to a different storage solution or when reorganizing storage resources.
 #
 # Usage:
-# ./VMConfigChangeStorage.sh <start_id> <end_id> <hostname> <current_storage> <new_storage>
+# ./BulkChangeStorage.sh <start_id> <end_id> <hostname> <current_storage> <new_storage>
 #   start_id - The starting VM ID for the operation.
 #   end_id - The ending VM ID for the operation.
 #   hostname - The hostname of the Proxmox node where the VMs are configured.
 #   current_storage - The current identifier of the storage used in the VMs' configuration.
 #   new_storage - The new identifier of the storage to replace the current one.
 # Example:
-#   ./VMConfigChangeStorage.sh 100 200 pve-node1 local-lvm local-zfs
+#   ./BulkChangeStorage.sh 100 200 pve-node1 local-lvm local-zfs
 
 # Check if required inputs are provided
 if [ $# -lt 5 ]; then

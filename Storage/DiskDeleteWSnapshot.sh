@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script is designed to manage snapshots and disk images within a Ceph storage pool.
 # Specifically, it checks for a particular snapshot named "__base__" and, if it is the only snapshot, 
 # unprotects and deletes it before removing the associated disk. This script is ideal for cleaning up after 

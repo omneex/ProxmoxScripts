@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script sets the CPU type and the number of cores for a range of virtual machines (VMs) within a Proxmox VE environment.
 # By default, it will use the current CPU type unless specified.
 #

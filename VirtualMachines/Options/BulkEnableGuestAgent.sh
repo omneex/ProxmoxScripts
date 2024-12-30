@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script enables the QEMU guest agent for a range of virtual machines (VMs) within a Proxmox VE environment.
 # Optionally, it can restart the VMs after enabling the guest agent.
 #

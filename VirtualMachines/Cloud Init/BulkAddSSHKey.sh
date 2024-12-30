@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script adds an SSH public key to a range of virtual machines (VMs) within a Proxmox VE environment.
 # It appends a new SSH public key for each VM and regenerates the Cloud-Init image to apply the changes.
 #

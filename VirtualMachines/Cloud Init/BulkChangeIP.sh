@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script updates the IP addresses of a range of virtual machines (VMs) within a Proxmox VE environment.
 # It assigns each VM a unique static IP, incrementing from a starting IP address, updates their network bridge configuration,
 # and regenerates the Cloud-Init image to apply the changes.

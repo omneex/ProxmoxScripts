@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script is designed to automate the process of changing the network bridge configuration for a range of virtual machines (VMs) on a Proxmox VE cluster.
 # It iterates through a specified range of VM IDs, modifying their configuration files to replace an old network bridge with a new one if present.
 # The script checks for the existence of each VM's configuration file and ensures that changes are only made where applicable.

@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script automates the process of setting up a serial console on a Debian-based system. It creates necessary configuration files,
 # updates GRUB to ensure the console output is directed to both the default terminal and the serial port, and enables a getty service 
 # on the specified serial port.

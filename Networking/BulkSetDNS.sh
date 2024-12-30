@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script sets the DNS servers and search domain for all nodes in the Proxmox VE cluster.
 #
 # Usage:

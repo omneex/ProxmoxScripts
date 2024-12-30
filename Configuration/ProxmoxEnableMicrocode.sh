@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script enables microcode updates for all nodes in a Proxmox VE cluster.
 #
 # Usage:

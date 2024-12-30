@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script guides through the installation and setup of Proxmox with Ceph, ensuring efficient usage of local storage and proper configuration of OSDs.
 #
 # Usage:

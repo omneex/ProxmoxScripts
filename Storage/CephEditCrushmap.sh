@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script manages the decompilation and recompilation of the Ceph cluster's CRUSH map,
 # facilitating custom modifications. The script supports commands to either decompile the 
 # current CRUSH map from a compiled state into a human-readable format or recompile it back 

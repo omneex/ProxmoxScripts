@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script exports Proxmox VM and LXC details from config files in /etc/pve/nodes to a CSV file.
 # Usage:
 # ./ExportProxmoxResources.sh [lxc|vm|both]

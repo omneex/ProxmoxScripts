@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script checks for current errors in the Proxmox system, including faults in storage, memory, CPU, networking,
 # Ceph, and system logs. It provides a succinct summary to quickly diagnose any issues with the system.
 #

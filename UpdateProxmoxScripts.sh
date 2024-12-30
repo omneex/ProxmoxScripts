@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script updates the contents of the Proxmox scripts repository without replacing the top-level folder.
 # It clones the repository into a temporary directory, clears the original folder's contents,
 # and moves the new files into the original folder.

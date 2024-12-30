@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script configures network interfaces for bonding and VLAN bridging on a Linux system.
 # It checks if the necessary inputs are provided, creates configuration entries for a specified bond and VLAN ID,
 # and inserts these entries into the network configuration file in a sorted order based on interface names.

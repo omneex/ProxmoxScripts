@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script updates the Cloud-Init username and password for a range of virtual machines (VMs) within a Proxmox VE environment.
 # It allows you to set a new username (optional) and password (required) for each VM and regenerates the Cloud-Init image to apply the changes.
 #

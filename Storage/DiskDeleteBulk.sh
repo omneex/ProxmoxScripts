@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script automates the process of deleting specific disk images from a Ceph storage pool.
 # It is designed to operate over a range of virtual machine (VM) disk images, identifying each 
 # by a unique naming convention and deleting them from the specified Ceph pool. This is particularly 

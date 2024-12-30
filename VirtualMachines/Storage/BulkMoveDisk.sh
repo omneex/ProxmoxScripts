@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script facilitates the migration of virtual machine (VM) disks across different storage backends on a Proxmox VE environment.
 # It iterates over a specified range of VM IDs and moves their primary disks (assumed to be 'sata0') to a designated target storage.
 # This is useful for managing storage utilization, upgrading to new storage hardware, or balancing loads across different storage systems.

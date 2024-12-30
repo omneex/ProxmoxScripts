@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script deletes all virtual machines (VMs) currently listed on the Proxmox VE environment.
 # It performs three actions for each VM: unprotects, stops, and destroys them.
 # WARNING: This script will permanently delete all VMs on the Proxmox machine.

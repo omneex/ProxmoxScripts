@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script retrieves the network configuration details for all virtual machines (VMs) across all nodes in a Proxmox cluster.
 # It outputs the MAC addresses associated with each VM, helping in network configuration audits or inventory management.
 # The script utilizes the Proxmox VE command-line tool `pvesh` to fetch information in JSON format and parses it using `jq`.

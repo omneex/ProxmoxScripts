@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script sets the time server for all nodes in the Proxmox VE cluster.
 # The default timezone is set to America/New_York.
 #

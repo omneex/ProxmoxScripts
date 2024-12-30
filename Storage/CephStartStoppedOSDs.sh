@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script starts all stopped Ceph OSDs within a Proxmox VE environment.
 #
 # Usage:

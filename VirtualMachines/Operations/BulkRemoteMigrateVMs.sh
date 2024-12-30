@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 # This script migrates virtual machines (VMs) from a local Proxmox node to a target Proxmox node.
 # It utilizes the Proxmox API for migration and requires proper authentication using an API token.
 # The script removes any existing Cloud-Init drives before initiating the migration and adjusts VM IDs based on a provided offset.
