@@ -10,7 +10,7 @@
 #   4. (Optional) Sets default inbound policy to DROP for the datacenter firewall (commented by default).
 #
 # Usage:
-#   ./EnableFirewallSetup.sh <management_subnet>
+#   ./EnableFirewallSetup.sh <management_subnet/netmask>
 #     management_subnet - e.g. 192.168.1.0/24
 #
 # Example:

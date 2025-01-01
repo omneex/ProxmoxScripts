@@ -4,7 +4,7 @@
 # The default timezone is set to America/New_York.
 #
 # Usage:
-# ./SetTimeServer.sh [timezone]
+# ./SetTimeServer.sh <timezone>
 
 # Assign the timezone, default to America/New_York if not provided
 TIMEZONE=${1:-America/New_York}

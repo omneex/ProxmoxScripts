@@ -4,9 +4,6 @@
 #
 # Usage:
 # ./StartStoppedOSDs.sh
-#
-# Example:
-#   ./StartStoppedOSDs.sh
 
 # Get the list of all stopped OSDs
 STOPPED_OSDS=$(ceph osd tree | awk '/down/ {print $4}')
