@@ -1,5 +1,7 @@
 # Proxmox VE Management Scripts
 
+[![Deploy static content to Pages](https://github.com/coelacant1/ProxmoxScripts/actions/workflows/static.yml/badge.svg?branch=main)](https://github.com/coelacant1/ProxmoxScripts/actions/workflows/static.yml)
+
 This repository is dedicated to providing automation scripts for managing Proxmox VE (Virtual Environment) systems efficiently. The scripts are designed for system administrators and DevOps professionals who need to streamline their Proxmox operations.
 
 Explore the scripts for Proxmox VE management on the website:
@@ -12,7 +14,7 @@ These instructions will guide you on how to clone this repository and start usin
 ### Prerequisites
 
 Before using these scripts, ensure you have the following:
-- Proxmox VE 6.x or newer installed and running, tested on PVE 8.x.
+- Proxmox VE 8.x or newer installed and running, tested on PVE 8.x.
 - SSH access to your Proxmox server with appropriate privileges.
 - Knowledge of Proxmox operations and Linux shell command execution.
 - You have read and understand what the scripts are doing on your system.
