@@ -10,6 +10,8 @@
 # Additionally, if the notes field already has "IP Address: ...", that line will be updated
 # with the new IP, rather than adding a duplicate line.
 #
+# Requires apt install arp-scan to find mac without Cloud-Init drives active
+#
 # Usage:
 #   ./UpdateVMNotesWithIP.sh
 
@@ -27,29 +29,33 @@ for VMID in $VM_IDS; do
         echo " - Unable to retrieve IP address via guest agent for VM $VMID."
 
         # Get the MAC address of the VM (assuming net0)
-        MAC_ADDRESS=$(qm config "$VMID" | grep -E '^net\d+: ' | grep -oP 'mac=\K[^,]+')
-        if [ -z "$MAC_ADDRESS" ]; then
-            echo " - Could not retrieve MAC address for VM $VMID. Skipping."
-            continue
-        fi
+        MAC_ADDRESS=$(
+            qm config "$VMID" \
+            | grep -E '^net[0-9]+:' \
+            | grep -oE '([[:xdigit:]]{2}:){5}[[:xdigit:]]{2}'
+        )
         echo " - Retrieved MAC address: $MAC_ADDRESS"
 
         # Identify the bridge or VLAN
-        VLAN=$(qm config "$VMID" | grep -E '^net\d+: ' | grep -oP 'bridge=\K\S+')
-        if [ -z "$VLAN" ]; then
-            echo " - Unable to retrieve VLAN/bridge info for VM $VMID. Skipping."
-            continue
-        fi
+        VLAN=$(
+            qm config "$VMID" \
+            | grep -E '^net[0-9]+:' \
+            | grep -oP 'bridge=\K[^,]+'
+        )
         echo " - Retrieved VLAN/bridge: $VLAN"
 
         # Ping scan the VLAN to find IP by MAC address (requires nmap or similar)
         # This step depends heavily on the environment; adapt as needed.
-        IP_ADDRESS=$(nmap -sn -oG - "$VLAN" 2>/dev/null | grep -i "$MAC_ADDRESS" | awk '{print $2}')
+        IP_ADDRESS=$(
+            arp-scan --interface="$VLAN" --localnet 2>/dev/null \
+            | grep -i "$MAC_ADDRESS" \
+            | awk '{print $1}'
+        )
         if [ -z "$IP_ADDRESS" ]; then
             IP_ADDRESS="Could not determine IP address"
-            echo " - Unable to determine IP via VLAN scan for VM $VMID."
+            echo " - Unable to determine IP via ARP scan for VM $VMID."
         else
-            echo " - Retrieved IP address via VLAN scan: $IP_ADDRESS"
+            echo " - Retrieved IP address via ARP scan: $IP_ADDRESS"
         fi
     else
         echo " - Retrieved IP address via guest agent: $IP_ADDRESS"
@@ -75,9 +81,9 @@ for VMID in $VM_IDS; do
     fi
 
     # Update the VM notes
-    qm set "$VMID" --notes "$UPDATED_NOTES"
-    echo " - Updated notes for VM ID: $VMID"
+    qm set "$VMID" --description "$UPDATED_NOTES"
+    echo " - Updated description for VM ID: $VMID"
     echo
 done
 
-echo "=== QEMU VM notes update process completed! ==="
+echo "=== QEMU VM description update process completed! ==="

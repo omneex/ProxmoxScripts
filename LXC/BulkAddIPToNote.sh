@@ -13,6 +13,9 @@
 # Usage:
 #   ./UpdateLXCNotesWithIP.sh
 #
+# Changes:
+# V1.1: Fixed mixup between pct and qm, changed to description instead of notes
+#
 
 # Loop through all LXC containers in the cluster
 CT_IDS=$(pct list | awk 'NR>1 {print $1}')
@@ -69,13 +72,13 @@ for CTID in $CT_IDS; do
         UPDATED_NOTES=$(echo "$EXISTING_NOTES" | sed -E "s|^IP Address:.*|IP Address: $IP_ADDRESS|")
     else
         # Append new line
-        UPDATED_NOTES="${EXISTING_NOTES}\nIP Address: $IP_ADDRESS"
+        UPDATED_NOTES="${EXISTING_NOTES}<br/>IP Address: $IP_ADDRESS"
     fi
 
     # Update container notes
-    pct set "$CTID" --notes "$UPDATED_NOTES"
-    echo " - Updated notes for container $CTID"
+    pct set "$CTID" --description  "$UPDATED_NOTES"
+    echo " - Updated description  for container $CTID"
     echo
 done
 
-echo "=== LXC container notes update process completed! ==="
+echo "=== LXC container description  update process completed! ==="

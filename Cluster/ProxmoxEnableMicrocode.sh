@@ -13,13 +13,13 @@ enable_microcode() {
 }
 
 # Loop through all nodes in the cluster
-for NODE in $(pvecm nodes | awk 'NR>1 {print $2}'); do
+for NODE in $(pvecm nodes | awk 'NR>1 {print $3}'); do
     echo "Connecting to node: $NODE"
-    ssh root@$NODE "$(declare -f enable_microcode); enable_microcode"
+    ssh root@"$NODE" "$(declare -f enable_microcode); enable_microcode"
     echo " - Microcode update completed for node: $NODE"
 done
 
-# Update the local node
+# Update the local node (optional if you want to ensure the local node is updated last)
 enable_microcode
 
 echo "Microcode updates enabled for all nodes!"
