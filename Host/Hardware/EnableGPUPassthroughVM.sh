@@ -7,12 +7,12 @@
 # direct access to GPU hardware.
 #
 # Usage:
-# ./EnableGPUPassthrough.sh <gpu_type> <gpu_ids>
+# ./EnableGPUPassthroughVM.sh <gpu_type> <gpu_ids>
 #   gpu_type - Specify 'nvidia' or 'amd' depending on the GPU manufacturer.
 #   gpu_ids - Specify the PCI IDs of the GPUs, formatted as 'vendor_id:device_id'.
 # Examples:
-#   ./EnableGPUPassthrough.sh nvidia 10de:1e78
-#   ./EnableGPUPassthrough.sh amd 1002:67df
+#   ./EnableGPUPassthroughVM.sh nvidia 10de:1e78
+#   ./EnableGPUPassthroughVM.sh amd 1002:67df
 
 # Check if required inputs are provided
 if [ -z "$1" ] || [ -z "$2" ]; then
