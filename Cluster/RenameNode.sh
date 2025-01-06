@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # RenameNode.sh
 #
@@ -107,7 +107,7 @@ SSH_CMD="ssh -o StrictHostKeyChecking=no root@$OLDNODE"
 # We'll run a sequence of commands on <oldnode>:
 
 read -r -d '' REMOTE_SCRIPT <<EOF
-#!/usr/bin/env bash
+#!/bin/bash
 set -e
 
 echo "Setting hostname to '$NEWNODE'..."

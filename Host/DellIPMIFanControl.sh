@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # DellServerFanControl.sh
 #
@@ -76,7 +76,7 @@ EOF
 function create_run_script() {
     echo "Creating background run script at $RUN_SCRIPT ..."
     cat <<'EOF' > "$RUN_SCRIPT"
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # /usr/bin/DellServerFanControl-run.sh
 #

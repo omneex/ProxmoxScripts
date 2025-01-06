@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # CCPVE.sh
 #
@@ -85,7 +85,7 @@ echo "Repository extracted into: $BASE_EXTRACTED_DIR"
 ###############################################################################
 
 # Show the top commented lines from a .sh file, ignoring:
-#  1) #!/usr/bin/env bash
+#  1) #!/bin/bash
 #  2) Lines containing only '#'
 # until we reach the first line that doesn't begin with '#'.
 show_top_comments() {
@@ -98,7 +98,7 @@ show_top_comments() {
 
     local printing=false
     while IFS= read -r line; do
-        # skip #!/usr/bin/env bash
+        # skip #!/bin/bash
         if [[ "$line" =~ ^#! ]] && [[ "$line" =~ "bash" ]]; then
             continue
         fi

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
 # CCPVEOffline.sh
 #
@@ -58,7 +58,7 @@ show_ascii_art() {
 ###############################################################################
 
 # Show the top commented lines from a .sh file, ignoring:
-# - '#!/usr/bin/env bash'
+# - '#!/bin/bash'
 # - lines that are only '#'
 # until we reach a non-# line
 show_top_comments() {
