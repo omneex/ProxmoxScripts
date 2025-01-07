@@ -12,7 +12,7 @@
 #   ./FirstTimeProxmoxSetup.sh
 #
 
-# Function to remove enterprise repository and add the free repository
+# --- Function to remove enterprise repository and add the free repository ---
 setup_repositories() {
     echo "Setting up repositories on node: $(hostname)"
 
@@ -51,7 +51,7 @@ setup_repositories() {
     fi
 }
 
-# Function to disable the subscription nag
+# --- Function to disable the subscription nag ---
 disable_subscription_nag() {
     echo "Disabling subscription nag on node: $(hostname)"
     # Patch the JavaScript file to disable the subscription message
@@ -63,15 +63,21 @@ disable_subscription_nag() {
     fi
 }
 
-# Loop through all nodes in the cluster, applying the setup
-for NODE in $(pvecm nodes | awk 'NR>1 {print $2}'); do
-    echo "Connecting to node: $NODE"
-    ssh root@"$NODE" "$(declare -f setup_repositories); setup_repositories"
-    ssh root@"$NODE" "$(declare -f disable_subscription_nag); disable_subscription_nag"
-    echo " - Setup completed for node: $NODE"
+# --- Gather IPs for all cluster nodes (excluding local) from 'pvecm status' ---
+# Look for lines starting with "0x" (the node ID), skip the line containing '(local)',
+# and print the third field (the IP).
+REMOTE_NODES=$(pvecm status | awk '/^0x/ && !/\(local\)/ {print $3}')
+
+# --- Loop through all remote nodes in the cluster, applying the setup via SSH ---
+for NODE_IP in $REMOTE_NODES; do
+    echo "Connecting to node IP: $NODE_IP"
+    ssh root@"$NODE_IP" "$(declare -f setup_repositories); setup_repositories"
+    ssh root@"$NODE_IP" "$(declare -f disable_subscription_nag); disable_subscription_nag"
+    echo " - Setup completed for node IP: $NODE_IP"
+    echo
 done
 
-# Apply the setup to the local node as well
+# --- Apply the setup to the local node as well ---
 setup_repositories
 disable_subscription_nag
 
