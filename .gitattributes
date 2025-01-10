@@ -1,0 +1,5 @@
+# Force *.sh files to use LF
+*.sh text eol=lf
+
+# Python files LF
+*.py text eol=lf
