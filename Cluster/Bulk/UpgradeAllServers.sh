@@ -2,8 +2,7 @@
 #
 # UpgradeAllServers.sh
 #
-# A script to update all servers in the Proxmox cluster.
-# Automatically loops through all nodes in the Proxmox cluster, running:
+# A script to update all servers in the Proxmox cluster by running:
 #   apt-get update && apt-get -y upgrade
 # on each node (local + remote).
 #
@@ -12,79 +11,28 @@
 #
 # Description:
 #   1. Checks root privileges and confirms this is a Proxmox node.
-#   2. Prompts to install 'ssh' if not installed.
+#   2. Prompts to install 'ssh' if not already installed (though it's usually present on Proxmox).
 #   3. Ensures the node is part of a cluster.
-#   4. Gathers remote cluster node IPs using get_remote_node_ips (from Utilities.sh).
+#   4. Gathers remote cluster node IPs using get_remote_node_ips (from our utility functions).
 #   5. Updates the local node and all remote nodes in the cluster.
-#   6. Prompts whether to keep or remove any newly installed packages (like ssh).
+#   6. Prompts whether to keep or remove any newly installed packages.
 #
 # Example:
 #   ./UpgradeAllServers.sh
 #
 
-set -e
-
-# ---------------------------------------------------------------------------
-# @function find_utilities_script
-# @description
-#   Finds the root directory of the scripts folder by traversing upward until
-#   it finds a folder containing a Utilities subfolder.
-#   Returns the full path to Utilities/Utilities.sh if found, or exits with an
-#   error if not found within 15 levels.
-# ---------------------------------------------------------------------------
-find_utilities_script() {
-  # Check current directory first
-  if [[ -d "./Utilities" ]]; then
-    echo "./Utilities/Utilities.sh"
-    return 0
-  fi
-
-  local rel_path=""
-  for _ in {1..15}; do
-    cd ..
-    # If rel_path is empty, set it to '..' else prepend '../'
-    if [[ -z "$rel_path" ]]; then
-      rel_path=".."
-    else
-      rel_path="../$rel_path"
-    fi
-
-    if [[ -d "./Utilities" ]]; then
-      echo "$rel_path/Utilities/Utilities.sh"
-      return 0
-    fi
-  done
-
-  echo "Error: Could not find 'Utilities' folder within 15 levels." >&2
-  return 1
-}
-
-# ---------------------------------------------------------------------------
-# Locate and source the Utilities script
-# ---------------------------------------------------------------------------
-UTILITIES_SCRIPT="$(find_utilities_script)" || exit 1
-source "$UTILITIES_SCRIPT"
-
 ###############################################################################
-# Preliminary Checks via Utilities
+# Preliminary Checks
 ###############################################################################
-check_proxmox_and_root      # Ensure we are root on a Proxmox node
-install_or_prompt "ssh"     # SSH is required for remote updates
-check_cluster_membership    # Ensure this node is part of a cluster
-
-# Prompt to potentially remove newly installed packages at the end
-trap prompt_keep_installed_packages EXIT
+check_root
+check_proxmox
+check_cluster_membership
 
 ###############################################################################
 # Gather Node Information
 ###############################################################################
-# Get IP of the local node (first IPv4 address reported by hostname -I)
 LOCAL_NODE_IP="$(hostname -I | awk '{print $1}')"
-
-# Gather remote node IPs (excludes local)
-readarray -t REMOTE_NODE_IPS < <(get_remote_node_ips)
-
-# Combine local + remote
+readarray -t REMOTE_NODE_IPS < <( get_remote_node_ips )
 ALL_NODE_IPS=("$LOCAL_NODE_IP" "${REMOTE_NODE_IPS[@]}")
 
 ###############################################################################
@@ -92,20 +40,18 @@ ALL_NODE_IPS=("$LOCAL_NODE_IP" "${REMOTE_NODE_IPS[@]}")
 ###############################################################################
 echo "Updating all servers in the Proxmox cluster..."
 
-for node_ip in "${ALL_NODE_IPS[@]}"; do
+for nodeIp in "${ALL_NODE_IPS[@]}"; do
   echo "------------------------------------------------"
-  echo "Updating node at IP: $node_ip"
+  echo "Updating node at IP: \"${nodeIp}\""
 
-  # If this IP matches our local IP, we update locally
-  if [[ "$node_ip" == "$LOCAL_NODE_IP" ]]; then
+  if [[ "${nodeIp}" == "${LOCAL_NODE_IP}" ]]; then
     apt-get update && apt-get -y upgrade
     echo "Local node update completed."
   else
-    # Otherwise, update via SSH
-    if ssh "root@${node_ip}" "apt-get update && apt-get -y upgrade"; then
-      echo "Remote node $node_ip update completed."
+    if ssh "root@${nodeIp}" "apt-get update && apt-get -y upgrade"; then
+      echo "Remote node \"${nodeIp}\" update completed."
     else
-      echo "Failed to update node $node_ip."
+      echo "Failed to update node \"${nodeIp}\"."
     fi
   fi
 done

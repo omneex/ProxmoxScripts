@@ -16,117 +16,87 @@
 #   ./EnablePWMFanControl.sh install 35 80 50 255
 #   ./EnablePWMFanControl.sh uninstall    # Uninstalls fancontrol and reverts to default
 #
-# -------------------------------------------------------------------------------
 # This script:
-#   1) Installs the 'fancontrol' package if needed.
+#   1) Installs the 'fancontrol' package if needed (prompts before installing).
 #   2) Creates or updates /etc/fancontrol with min/max temp and min/max PWM settings.
 #   3) Enables and starts the fancontrol systemd service.
 #   4) Allows uninstalling fancontrol and reverting system fans to defaults.
 #
 # Make sure to run this script on a Proxmox node that has direct access to PWM
-# fan control via /sys/class/hwmon/ or similar device paths.
-# -------------------------------------------------------------------------------
+# fan control (e.g., /sys/class/hwmon/).
 
-set -e  # Exit immediately on any non-zero command return
+###############################################################################
+# Preliminary Checks
+###############################################################################
+check_root
+check_proxmox
 
-# --- Preliminary Checks ---------------------------------------------------------
-if [[ $EUID -ne 0 ]]; then
-  echo "Error: This script must be run as root (sudo)."
-  exit 1
-fi
-
-if ! command -v apt-get &>/dev/null; then
-  echo "Error: 'apt-get' command not found. This script is intended for Debian-based systems."
-  exit 2
-fi
-
-# --- Helper Functions -----------------------------------------------------------
-
+###############################################################################
+# Helper Functions
+###############################################################################
 show_usage() {
   echo "Usage:"
-  echo "  $0 install [<min-temp> <max-temp> <min-pwm> <max-pwm>]"
-  echo "  $0 uninstall"
+  echo "  \"$0\" install [<min-temp> <max-temp> <min-pwm> <max-pwm>]"
+  echo "  \"$0\" uninstall"
   echo
   echo "Examples:"
-  echo "  $0 install"
-  echo "  $0 install 35 80 50 255"
-  echo "  $0 uninstall"
+  echo "  \"$0\" install"
+  echo "  \"$0\" install 35 80 50 255"
+  echo "  \"$0\" uninstall"
 }
 
-# Installs fancontrol and configures the PWM settings
 install_fancontrol() {
-  local MIN_TEMP=$1
-  local MAX_TEMP=$2
-  local MIN_PWM=$3
-  local MAX_PWM=$4
+  local minTemp="$1"
+  local maxTemp="$2"
+  local minPwm="$3"
+  local maxPwm="$4"
 
-  echo "Installing fancontrol package..."
-  apt-get update -y
-  apt-get install -y fancontrol
+  install_or_prompt "fancontrol"
 
-  # Attempt to detect the hwmon device automatically (naive approach).
-  # Adjust or hard-code as necessary for your environment.
-  # Typically the user would run 'sensors' or 'pwmconfig' to identify device paths.
-  local HWMON_DEVICE
-  HWMON_DEVICE="$(ls /sys/class/hwmon/ | head -n1)"
-  if [[ -z "$HWMON_DEVICE" ]]; then
+  local hwmonDevice
+  hwmonDevice="$(ls /sys/class/hwmon/ | head -n1)"
+  if [[ -z "$hwmonDevice" ]]; then
     echo "Error: No hwmon device found. Ensure your system supports PWM fan control."
     exit 3
   fi
 
-  # Default fancontrol config location
   local FANCONTROL_CONF="/etc/fancontrol"
 
-  echo "Generating $FANCONTROL_CONF with the following parameters:"
-  echo "  Min Temp  : $MIN_TEMP"
-  echo "  Max Temp  : $MAX_TEMP"
-  echo "  Min PWM   : $MIN_PWM"
-  echo "  Max PWM   : $MAX_PWM"
-  echo "  Hwmon Dev : $HWMON_DEVICE"
+  echo "Generating \"$FANCONTROL_CONF\" with:"
+  echo "  Min Temp : \"$minTemp\""
+  echo "  Max Temp : \"$maxTemp\""
+  echo "  Min PWM  : \"$minPwm\""
+  echo "  Max PWM  : \"$maxPwm\""
+  echo "  HwmonDev : \"$hwmonDevice\""
 
   cat <<EOF > "$FANCONTROL_CONF"
 #------------------------------------------------------------------------------
 # /etc/fancontrol
 # Created by EnablePWMFanControl.sh
-#
-# This config assumes a single PWM channel and a single temperature sensor
-# for demonstration. Adjust to match your system's sensors (see pwmconfig).
 #------------------------------------------------------------------------------
 
 INTERVAL=10
-
-# The device path for hardware monitoring
-DEVPATH=hwmon0=/sys/class/hwmon/$HWMON_DEVICE
-DEVNAME=hwmon0=$(cat /sys/class/hwmon/"$HWMON_DEVICE"/name 2>/dev/null || echo "unknown")
-
-# Assign sensors
-# Example: If your pwm is "pwm1" and temp sensor is "temp1_input"
+DEVPATH=hwmon0=/sys/class/hwmon/$hwmonDevice
+DEVNAME=hwmon0=$(cat /sys/class/hwmon/"$hwmonDevice"/name 2>/dev/null || echo "unknown")
 FCTEMPS=hwmon0/pwm1=hwmon0/temp1_input
 FCFANS=hwmon0/pwm1=hwmon0/fan1_input
-
-# Temperature and PWM settings
-# These define the min->max temperature range and the corresponding
-# min->max PWM speeds for fancontrol to interpolate.
-MINTEMP=hwmon0/pwm1=$MIN_TEMP
-MAXTEMP=hwmon0/pwm1=$MAX_TEMP
-MINPWM=hwmon0/pwm1=$MIN_PWM
-MAXPWM=hwmon0/pwm1=$MAX_PWM
-
-# Start/stop thresholds (optional, used for hysteresis)
-MINSTOP=hwmon0/pwm1=$MIN_PWM
-MINSTART=hwmon0/pwm1=$(($MIN_PWM + 10))
-
+MINTEMP=hwmon0/pwm1=$minTemp
+MAXTEMP=hwmon0/pwm1=$maxTemp
+MINPWM=hwmon0/pwm1=$minPwm
+MAXPWM=hwmon0/pwm1=$maxPwm
+MINSTOP=hwmon0/pwm1=$minPwm
+MINSTART=hwmon0/pwm1=$(($minPwm + 10))
 EOF
 
-  echo "Enabling and starting fancontrol service..."
   systemctl enable fancontrol
   systemctl restart fancontrol
+
   echo "fancontrol installation and configuration complete."
+  prompt_keep_installed_packages
 }
 
-# Uninstalls fancontrol and reverts to default
 uninstall_fancontrol() {
-  echo "Stopping and disabling fancontrol service..."
+  echo "Stopping and disabling fancontrol..."
   systemctl stop fancontrol || true
   systemctl disable fancontrol || true
 
@@ -136,24 +106,24 @@ uninstall_fancontrol() {
 
   local FANCONTROL_CONF="/etc/fancontrol"
   if [[ -f "$FANCONTROL_CONF" ]]; then
-    echo "Removing $FANCONTROL_CONF..."
+    echo "Removing \"$FANCONTROL_CONF\"..."
     rm -f "$FANCONTROL_CONF"
   fi
 
-  echo "fancontrol uninstalled. System fans are reverted to default."
+  echo "fancontrol uninstalled. System fans reverted to default."
 }
 
-# --- Main -----------------------------------------------------------------------
-ACTION="$1"
-case "$ACTION" in
+###############################################################################
+# Main
+###############################################################################
+action="$1"
+case "$action" in
   install)
-    # Default values if none are provided
-    MIN_TEMP="${2:-30}"
-    MAX_TEMP="${3:-70}"
-    MIN_PWM="${4:-60}"
-    MAX_PWM="${5:-255}"
-
-    install_fancontrol "$MIN_TEMP" "$MAX_TEMP" "$MIN_PWM" "$MAX_PWM"
+    minTemp="${2:-30}"
+    maxTemp="${3:-70}"
+    minPwm="${4:-60}"
+    maxPwm="${5:-255}"
+    install_fancontrol "$minTemp" "$maxTemp" "$minPwm" "$maxPwm"
     ;;
   uninstall)
     uninstall_fancontrol

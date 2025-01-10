@@ -28,130 +28,81 @@
 #   - 'pct' is required (part of the PVE/LXC utilities).
 #   - IP increment logic uses Utilities.sh (ip_to_int, int_to_ip) for consistency.
 
-set -e
-
-# -----------------------------------------------------------------------------
-# @function find_utilities_script
-# @description
-#   Finds the root directory of the scripts folder by traversing upward until
-#   it finds a folder containing a Utilities subfolder.
-#   Returns the full path to Utilities/Utilities.sh if found, or exits with an
-#   error if not found within 15 levels.
-# -----------------------------------------------------------------------------
-find_utilities_script() {
-  # Check current directory first
-  if [[ -d "./Utilities" ]]; then
-    echo "./Utilities/Utilities.sh"
-    return 0
-  fi
-
-  local rel_path=""
-  for _ in {1..15}; do
-    cd ..
-    # If rel_path is empty, set it to '..' else prepend '../'
-    if [[ -z "$rel_path" ]]; then
-      rel_path=".."
-    else
-      rel_path="../$rel_path"
-    fi
-
-    if [[ -d "./Utilities" ]]; then
-      echo "$rel_path/Utilities/Utilities.sh"
-      return 0
-    fi
-  done
-
-  echo "Error: Could not find 'Utilities' folder within 15 levels." >&2
-  return 1
-}
-
-# ---------------------------------------------------------------------------
-# Locate and source the Utilities script
-# ---------------------------------------------------------------------------
-UTILITIES_SCRIPT="$(find_utilities_script)" || exit 1
-source "$UTILITIES_SCRIPT"
-
 ###############################################################################
 # MAIN
 ###############################################################################
-main() {
-  # --- Parse and validate arguments ------------------------------------------
-  if [[ $# -lt 4 ]]; then
-    echo "Usage: $0 <start_ct_id> <num_cts> <start_ip/cidr> <bridge> [gateway]"
-    echo "Example:"
-    echo "  $0 400 5 192.168.1.50/24 vmbr0 192.168.1.1"
-    echo "  (Updates CTs 400..404 with IPs 192.168.1.50..54/24 on vmbr0, gateway 192.168.1.1)"
-    exit 1
-  fi
 
-  local start_ct_id="$1"
-  local num_cts="$2"
-  local start_ip_cidr="$3"
-  local bridge="$4"
-  local gateway="${5:-}"
+# --- Parse and validate arguments ------------------------------------------
+if [[ $# -lt 4 ]]; then
+  echo "Usage: $0 <start_ct_id> <num_cts> <start_ip/cidr> <bridge> [gateway]"
+  echo "Example:"
+  echo "  $0 400 5 192.168.1.50/24 vmbr0 192.168.1.1"
+  echo "  (Updates CTs 400..404 with IPs 192.168.1.50..54/24 on vmbr0, gateway 192.168.1.1)"
+  exit 1
+fi
 
-  # --- Ensure we are running on Proxmox as root ------------------------------
-  check_proxmox_and_root  # Must be root and on a Proxmox node
+local start_ct_id="$1"
+local num_cts="$2"
+local start_ip_cidr="$3"
+local bridge="$4"
+local gateway="${5:-}"
 
-  # If cluster membership check is needed, uncomment:
-  # check_cluster_membership
+# --- Ensure we are running on Proxmox as root ------------------------------
+check_proxmox_and_root  # Must be root and on a Proxmox node
+
+# If cluster membership check is needed, uncomment:
+# check_cluster_membership
 
 
-  # --- Parse out IP and subnet mask ------------------------------------------
-  local start_ip
-  local subnet_mask
-  IFS='/' read -r start_ip subnet_mask <<< "$start_ip_cidr"
+# --- Parse out IP and subnet mask ------------------------------------------
+local start_ip
+local subnet_mask
+IFS='/' read -r start_ip subnet_mask <<< "$start_ip_cidr"
 
-  if [[ -z "$start_ip" || -z "$subnet_mask" ]]; then
-    echo "Error parsing start_ip/cidr: $start_ip_cidr. Format must be X.X.X.X/XX"
-    exit 1
-  fi
+if [[ -z "$start_ip" || -z "$subnet_mask" ]]; then
+  echo "Error parsing start_ip/cidr: $start_ip_cidr. Format must be X.X.X.X/XX"
+  exit 1
+fi
 
-  # --- Convert start IP to integer -------------------------------------------
-  local start_ip_int
-  start_ip_int="$(ip_to_int "$start_ip")"
+# --- Convert start IP to integer -------------------------------------------
+local start_ip_int
+start_ip_int="$(ip_to_int "$start_ip")"
 
-  # --- Display summary -------------------------------------------------------
-  echo "=== Starting IP update for $num_cts container(s) ==="
-  echo " - Starting container ID: $start_ct_id"
-  echo " - Starting IP: $start_ip/$subnet_mask"
-  if [[ -n "$gateway" ]]; then
-    echo " - Gateway: $gateway"
-  else
-    echo " - No gateway specified"
-  fi
+# --- Display summary -------------------------------------------------------
+echo "=== Starting IP update for $num_cts container(s) ==="
+echo " - Starting container ID: $start_ct_id"
+echo " - Starting IP: $start_ip/$subnet_mask"
+if [[ -n "$gateway" ]]; then
+  echo " - Gateway: $gateway"
+else
+  echo " - No gateway specified"
+fi
 
-  # --- Main Loop: update IPs for each container ------------------------------
-  for (( i=0; i<num_cts; i++ )); do
-    local current_ct_id=$(( start_ct_id + i ))
-    local current_ip_int=$(( start_ip_int + i ))
-    local new_ip
-    new_ip="$(int_to_ip "$current_ip_int")"
+# --- Main Loop: update IPs for each container ------------------------------
+for (( i=0; i<num_cts; i++ )); do
+  local current_ct_id=$(( start_ct_id + i ))
+  local current_ip_int=$(( start_ip_int + i ))
+  local new_ip
+  new_ip="$(int_to_ip "$current_ip_int")"
 
-    if pct config "$current_ct_id" &>/dev/null; then
-      echo "Updating IP for container $current_ct_id to $new_ip/$subnet_mask on $bridge..."
+  if pct config "$current_ct_id" &>/dev/null; then
+    echo "Updating IP for container $current_ct_id to $new_ip/$subnet_mask on $bridge..."
 
-      if [[ -z "$gateway" ]]; then
-        pct set "$current_ct_id" -net0 name=eth0,bridge="$bridge",ip="$new_ip/$subnet_mask"
-      else
-        pct set "$current_ct_id" -net0 name=eth0,bridge="$bridge",ip="$new_ip/$subnet_mask",gw="$gateway"
-      fi
-
-      if [[ $? -eq 0 ]]; then
-        echo " - Successfully updated container $current_ct_id."
-      else
-        echo " - Failed to update container $current_ct_id (check errors above)."
-      fi
+    if [[ -z "$gateway" ]]; then
+      pct set "$current_ct_id" -net0 name=eth0,bridge="$bridge",ip="$new_ip/$subnet_mask"
     else
-      echo " - Container $current_ct_id does not exist. Skipping."
+      pct set "$current_ct_id" -net0 name=eth0,bridge="$bridge",ip="$new_ip/$subnet_mask",gw="$gateway"
     fi
-  done
 
-  echo "=== Bulk IP change process complete! ==="
-  echo "If the containers are running, you may need to restart them or reapply networking."
-}
+    if [[ $? -eq 0 ]]; then
+      echo " - Successfully updated container $current_ct_id."
+    else
+      echo " - Failed to update container $current_ct_id (check errors above)."
+    fi
+  else
+    echo " - Container $current_ct_id does not exist. Skipping."
+  fi
+done
 
-# -----------------------------------------------------------------------------
-# Run the main function
-# -----------------------------------------------------------------------------
-main "$@"
+echo "=== Bulk IP change process complete! ==="
+echo "If the containers are running, you may need to restart them or reapply networking."

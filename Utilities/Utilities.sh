@@ -19,25 +19,34 @@ SESSION_INSTALLED_PACKAGES=()
 # 1. Misc Functions
 ###############################################################################
 
-# --- Check Proxmox and Root User -------------------------------------------
-# @function check_proxmox_and_root
-# @description Checks if the current user is root and if this is a Proxmox node.
-# Exits if either condition is not met.
+# --- Check Root User -------------------------------------------------------
+# @function check_root
+# @description Checks if the current user is root. Exits if not.
 # @usage
-#   check_proxmox_and_root
+#   check_root
 # @return
-#   Exits 1 if not root, exits 2 if not Proxmox.
-check_proxmox_and_root() {
+#   Exits 1 if not root.
+check_root() {
     if [[ $EUID -ne 0 ]]; then
         echo "Error: This script must be run as root (sudo)."
         exit 1
     fi
+}
 
+# --- Check Proxmox ---------------------------------------------------------
+# @function check_proxmox
+# @description Checks if this is a Proxmox node. Exits if not.
+# @usage
+#   check_proxmox
+# @return
+#   Exits 2 if not Proxmox.
+check_proxmox() {
     if ! command -v pveversion &>/dev/null; then
         echo "Error: 'pveversion' command not found. Are you sure this is a Proxmox node?"
         exit 2
     fi
 }
+
 
 # --- Install or Prompt Function --------------------------------------------
 # @function install_or_prompt

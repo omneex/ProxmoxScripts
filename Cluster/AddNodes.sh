@@ -25,66 +25,18 @@
 #   1) Prompts for the 'root' SSH password for each NEW node (not the cluster).
 #   2) SSHes into each new node and runs 'pvecm add <CLUSTER_IP>' with --link0 set to
 #      that node's IP, and optionally --link1 if you've provided link1 addresses.
-#   3) Because it needs a password, we use an embedded 'expect' script to pass the
-#      password automatically (only once entered by you). The password is never
-#      echoed to the terminal.
-#
-# Requirements:
-#   - The 'expect' package must be installed on the cluster node you're running
-#     this script from (handled by install_or_prompt "expect" below).
+#   3) Uses an embedded 'expect' script to pass the password automatically. 
+#      The password is never echoed to the terminal.
 #
 
-set -e
-
-# ---------------------------------------------------------------------------
-# @function find_utilities_script
-# @description
-#   Finds the root directory of the scripts folder by traversing upward until
-#   it finds a folder containing a Utilities subfolder.
-#   Returns the full path to Utilities/Utilities.sh if found, or exits with an
-#   error if not found within 15 levels.
-# ---------------------------------------------------------------------------
-find_utilities_script() {
-  # Check current directory first
-  if [[ -d "./Utilities" ]]; then
-    echo "./Utilities/Utilities.sh"
-    return 0
-  fi
-
-  local rel_path=""
-  for _ in {1..15}; do
-    cd ..
-    # If rel_path is empty, set it to '..' else prepend '../'
-    if [[ -z "$rel_path" ]]; then
-      rel_path=".."
-    else
-      rel_path="../$rel_path"
-    fi
-
-    if [[ -d "./Utilities" ]]; then
-      echo "$rel_path/Utilities/Utilities.sh"
-      return 0
-    fi
-  done
-
-  echo "Error: Could not find 'Utilities' folder within 15 levels." >&2
-  return 1
-}
-
-# ---------------------------------------------------------------------------
-# Locate and source the Utilities script
-# ---------------------------------------------------------------------------
-UTILITIES_SCRIPT="$(find_utilities_script)" || exit 1
-source "$UTILITIES_SCRIPT"
-
 ###############################################################################
-# Preliminary Checks via Utilities
+# Preliminary Checks
 ###############################################################################
-check_proxmox_and_root         # Ensure we're root on a valid Proxmox node
-install_or_prompt "expect"     # Required for automated password entry
-check_cluster_membership       # Ensure this node is part of a cluster
+check_root              # Ensure we're running as root
+check_proxmox           # Ensure we're on a valid Proxmox node
+install_or_prompt "expect"  # Required for automated password entry
+check_cluster_membership     # Ensure this node is part of a cluster
 
-# Prompt at script exit to optionally remove any newly installed packages
 trap prompt_keep_installed_packages EXIT
 
 ###############################################################################
@@ -98,11 +50,10 @@ fi
 CLUSTER_IP="$1"
 shift
 
-NODES=()
+declare -a NODES=()
 USE_LINK1=false
-LINK1=()
+declare -a LINK1=()
 
-# Collect new node IPs until we hit '--link1' or run out of args
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --link1)
@@ -117,11 +68,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# If user specified --link1, parse that many link1 addresses
 if $USE_LINK1; then
   if [[ $# -lt ${#NODES[@]} ]]; then
-    echo "Error: You specified --link1 but not enough link1 addresses for each node."
-    echo "       You have ${#NODES[@]} new nodes, so you need at least ${#NODES[@]} link1 addresses."
+    echo "Error: You specified --link1 but did not provide enough addresses."
+    echo "       You have ${#NODES[@]} new node(s), so you need at least ${#NODES[@]} link1 address(es)."
     exit 1
   fi
   for ((i=0; i<${#NODES[@]}; i++)); do
@@ -133,7 +83,6 @@ fi
 ###############################################################################
 # Prompt for New Nodes' Root Password
 ###############################################################################
-# This password is used to SSH into each new node and run 'pvecm add'.
 echo -n "Enter the 'root' SSH password for the NEW node(s): "
 read -s NODE_PASSWORD
 echo
@@ -144,23 +93,21 @@ echo
 COUNTER=0
 for NODE_IP in "${NODES[@]}"; do
   echo "-----------------------------------------------------------------"
-  echo "Adding new node: $NODE_IP"
+  echo "Adding new node: \"$NODE_IP\""
 
-  # Build the 'pvecm add' command to run on the NEW node:
-  #   pvecm add <CLUSTER_IP> --link0 <NODE_IP> [--link1 <LINK1_IP>]
-  CMD="pvecm add ${CLUSTER_IP} --link0 ${NODE_IP}"
+  CMD="pvecm add \"$CLUSTER_IP\" --link0 \"$NODE_IP\""
   if $USE_LINK1; then
-    CMD+=" --link1 ${LINK1[$COUNTER]}"
-    echo "  Using link1: ${LINK1[$COUNTER]}"
+    CMD+=" --link1 \"${LINK1[$COUNTER]}\""
+    echo "  Using link1: \"${LINK1[$COUNTER]}\""
   fi
 
-  echo "  SSHing into $NODE_IP and executing: $CMD"
+  echo "  SSHing into \"$NODE_IP\" and executing: $CMD"
   
   /usr/bin/expect <<EOF
     set timeout -1
     log_user 0
 
-    spawn ssh -o StrictHostKeyChecking=no root@${NODE_IP} "$CMD"
+    spawn ssh -o StrictHostKeyChecking=no root@${NODE_IP} $CMD
 
     expect {
       -re ".*continue connecting.*" {
@@ -178,7 +125,7 @@ for NODE_IP in "${NODES[@]}"; do
 EOF
 
   ((COUNTER++))
-  echo "Node $NODE_IP add procedure completed."
+  echo "Node \"$NODE_IP\" add procedure completed."
   echo
 done
 

@@ -1,15 +1,15 @@
 #!/bin/bash
 #
-# GPU_PCI_Passthrough.sh
+# EnablePCIPassthroughLXC.sh
 #
 # A script to set up direct passthrough of a specific GPU or PCI device to one or more LXC containers in Proxmox,
 # based on a user-supplied PCI device ID (e.g., "01:00.0"). This script does *not* enable access to all PCI devices.
 #
 # Usage:
-#   ./GPU_PCI_Passthrough.sh <PCI_DEVICE_ID> <CTID_1> [<CTID_2> ... <CTID_n>]
+#   ./EnablePCIPassthroughLXC.sh <PCI_DEVICE_ID> <CTID_1> [<CTID_2> ... <CTID_n>]
 #
 # Example:
-#   ./GPU_PCI_Passthrough.sh 01:00.0 100 101
+#   ./EnablePCIPassthroughLXC.sh 01:00.0 100 101
 #
 # Notes:
 #   1. Ensure VT-d/AMD-Vi (IOMMU) is enabled, and Proxmox is configured for PCI passthrough. This may involve:
@@ -23,21 +23,12 @@
 #   4. Only "privileged" LXC containers can easily use PCI passthrough. By default, this script will set the container(s) to privileged.
 #   5. After making changes, stop and start each container for them to take effect (pct stop <CTID> && pct start <CTID>).
 #
-# [Further manual edits may be required depending on your environment and GPU driver specifics.]
-# -----------------------------------------------------------------------------
 
-set -e
-
-# --- Preliminary Checks -----------------------------------------------------
-if [[ $EUID -ne 0 ]]; then
-  echo "Error: This script must be run as root (sudo)."
-  exit 1
-fi
-
-if ! command -v pct &>/dev/null; then
-  echo "Error: 'pct' command not found. Are you sure this is a Proxmox host?"
-  exit 2
-fi
+###############################################################################
+# Preliminary Checks
+###############################################################################
+check_root
+check_proxmox
 
 if [[ $# -lt 2 ]]; then
   echo "Usage: $0 <PCI_DEVICE_ID> <CTID_1> [<CTID_2> ... <CTID_n>]"
@@ -46,54 +37,48 @@ fi
 
 PCI_DEVICE_ID="$1"
 shift
-CTIDS=("$@")
+CTID_ARRAY=("$@")
 
-# --- Functions --------------------------------------------------------------
-
-function enable_pci_passthrough_in_container_config() {
+###############################################################################
+# Functions
+###############################################################################
+function enablePciPassthroughInContainerConfig() {
   local ctid="$1"
-  local config_file="/etc/pve/lxc/${ctid}.conf"
+  local configFile="/etc/pve/lxc/${ctid}.conf"
 
-  if [[ ! -f "$config_file" ]]; then
-    echo "Warning: $config_file does not exist for CTID $ctid. Skipping..."
+  if [[ ! -f "$configFile" ]]; then
+    echo "Warning: \"${configFile}\" does not exist for CTID \"${ctid}\". Skipping..."
     return
   fi
 
-  # Ensure container is privileged
-  # (Setting unprivileged=0 forces the container to run as privileged.)
-  pct set "$ctid" --unprivileged 0
+  # Force privileged container
+  pct set "${ctid}" --unprivileged 0
 
-  # We'll create or update lines in the container config that allow passthrough of the specific PCI device.
-  # Typically, you need:
-  #   1) lxc.cgroup.devices.allow: c <major> <minor> rwm
-  #   2) lxc.mount.entry for the PCI device path in /sys
-
-  # For NVIDIA GPUs, the major device number is usually 195 (c 195:* rwm).
-  # For AMD/Intel, adjust as needed.
-  if ! grep -q "lxc.cgroup.devices.allow: c 195:* rwm" "$config_file"; then
-    echo "lxc.cgroup.devices.allow: c 195:* rwm" >> "$config_file"
+  # For NVIDIA GPUs, the major device number is typically 195 (c 195:* rwm).
+  # Adjust if using another GPU vendor.
+  if ! grep -q "lxc.cgroup.devices.allow: c 195:* rwm" "${configFile}"; then
+    echo "lxc.cgroup.devices.allow: c 195:* rwm" >> "${configFile}"
   fi
 
   # Add a mount entry for the specific PCI device path
-  local mount_entry="lxc.mount.entry: /sys/bus/pci/devices/0000:$PCI_DEVICE_ID /sys/bus/pci/devices/0000:$PCI_DEVICE_ID none bind,optional,create=dir"
-  if ! grep -q "$mount_entry" "$config_file"; then
-    echo "$mount_entry" >> "$config_file"
+  local mountEntry="lxc.mount.entry: /sys/bus/pci/devices/0000:${PCI_DEVICE_ID} /sys/bus/pci/devices/0000:${PCI_DEVICE_ID} none bind,optional,create=dir"
+  if ! grep -q "${mountEntry}" "${configFile}"; then
+    echo "${mountEntry}" >> "${configFile}"
   fi
 
-  echo "Configured PCI passthrough for container $ctid using device $PCI_DEVICE_ID (container is now privileged)."
+  echo "Configured PCI passthrough for container \"${ctid}\" using device \"${PCI_DEVICE_ID}\" (container is now privileged)."
 }
 
-# --- Main Logic -------------------------------------------------------------
-
-for ctid in "${CTIDS[@]}"; do
-  # Basic check if container exists
-  if ! pct config "$ctid" &>/dev/null; then
-    echo "Error: Container $ctid does not exist. Skipping..."
+###############################################################################
+# Main Logic
+###############################################################################
+for ctid in "${CTID_ARRAY[@]}"; do
+  if ! pct config "${ctid}" &>/dev/null; then
+    echo "Error: Container \"${ctid}\" does not exist. Skipping..."
     continue
   fi
 
-  # Attempt to enable PCI passthrough in the container config
-  enable_pci_passthrough_in_container_config "$ctid"
+  enablePciPassthroughInContainerConfig "${ctid}"
 done
 
 echo "Done. Please stop and start each container for changes to take effect."

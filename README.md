@@ -78,6 +78,12 @@ To execute these scripts offline on your system, follow these steps:
 
 ## Usage
 
+For direct script calls, you may need to call the Utilities.sh script to initialize functions:
+```bash
+./Utilities.sh
+./UpdateProxmoxScripts.sh
+```
+
 Example for description and example commands in each script in this repository:
 
 - **Remote Migrate VMs** (`RemoteMigrateVMs.sh`):

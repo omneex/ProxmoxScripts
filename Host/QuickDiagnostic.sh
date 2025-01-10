@@ -2,9 +2,9 @@
 #
 # QuickDiagnostic.sh
 #
-# This script checks for current errors in the Proxmox system, including faults in storage,
-# memory, CPU, networking, Ceph, and system logs. It provides a succinct summary to quickly
-# diagnose any issues with the system.
+# This script checks for current errors in the Proxmox system, including faults
+# in storage, memory, CPU, networking, Ceph, and system logs. It provides a succinct
+# summary to quickly diagnose any issues with the system.
 #
 # Usage:
 #   ./QuickDiagnostic.sh
@@ -19,125 +19,84 @@
 #   - The script uses standard Linux tools (dmesg, free, ps, top, journalctl) to gather info.
 #
 
-set -e
-
-# -----------------------------------------------------------------------------
-# @function find_utilities_script
-# @description
-#   Finds the root directory of the scripts folder by traversing upward until
-#   it finds a folder containing a Utilities subfolder.
-#   Returns the full path to Utilities/Utilities.sh if found, or exits with an
-#   error if not found within 15 levels.
-# -----------------------------------------------------------------------------
-find_utilities_script() {
-  # Check current directory first
-  if [[ -d "./Utilities" ]]; then
-    echo "./Utilities/Utilities.sh"
-    return 0
-  fi
-
-  local rel_path=""
-  for _ in {1..15}; do
-    cd ..
-    # If rel_path is empty, set it to '..' else prepend '../'
-    if [[ -z "$rel_path" ]]; then
-      rel_path=".."
-    else
-      rel_path="../$rel_path"
-    fi
-
-    if [[ -d "./Utilities" ]]; then
-      echo "$rel_path/Utilities/Utilities.sh"
-      return 0
-    fi
-  done
-
-  echo "Error: Could not find 'Utilities' folder within 15 levels." >&2
-  return 1
-}
-
-# ---------------------------------------------------------------------------
-# Locate and source the Utilities script
-# ---------------------------------------------------------------------------
-UTILITIES_SCRIPT="$(find_utilities_script)" || exit 1
-source "$UTILITIES_SCRIPT"
-
 ###############################################################################
 # FUNCTIONS
 ###############################################################################
 
-# --- Check storage errors and usage -----------------------------------------
+###############################################################################
+# Check storage errors and usage
+###############################################################################
 check_storage_errors() {
     echo "Checking storage errors..."
 
     # Use ZFS commands if available
-    local zpool_status=""
+    local zpoolStatus=""
     if command -v zpool &>/dev/null; then
-        zpool_status=$(zpool status 2>/dev/null | grep -i 'FAULTED\|DEGRADED' || true)
+        zpoolStatus="$(zpool status 2>/dev/null | grep -i 'FAULTED\|DEGRADED' || true)"
     fi
 
     # Use Ceph commands if available
-    local ceph_status=""
+    local cephStatus=""
     if command -v ceph &>/dev/null; then
-        ceph_status=$(ceph health 2>/dev/null | grep -i 'HEALTH_ERR\|HEALTH_WARN' || true)
+        cephStatus="$(ceph health 2>/dev/null | grep -i 'HEALTH_ERR\|HEALTH_WARN' || true)"
     fi
 
     # Basic usage via df
-    local storage_usage
-    storage_usage=$(df -h | awk '$5+0 > 90 {print "Warning: " $6 " is " $5 " full."}')
+    local storageUsage
+    storageUsage="$(df -h | awk '$5+0 > 90 {print "Warning: " $6 " is " $5 " full."}')"
 
     # LVM locks if lvs is installed
-    local locked_storage=""
+    local lockedStorage=""
     if command -v lvs &>/dev/null; then
-        locked_storage=$(lvs -o+lock_args 2>/dev/null | grep -i 'lock' || true)
+        lockedStorage="$(lvs -o+lock_args 2>/dev/null | grep -i 'lock' || true)"
     fi
 
-    if [[ -n "$zpool_status" ]]; then
+    if [[ -n "$zpoolStatus" ]]; then
         echo "Storage errors detected in ZFS:"
-        echo "$zpool_status"
-    elif [[ -n "$ceph_status" ]]; then
+        echo "$zpoolStatus"
+    elif [[ -n "$cephStatus" ]]; then
         echo "Storage errors detected in Ceph:"
-        echo "$ceph_status"
+        echo "$cephStatus"
     else
         echo "No ZFS/Ceph errors found."
     fi
 
-    if [[ -n "$storage_usage" ]]; then
+    if [[ -n "$storageUsage" ]]; then
         echo "Storage usage warning:"
-        echo "$storage_usage"
+        echo "$storageUsage"
     else
         echo "No storage usage issues found."
     fi
 
-    if [[ -n "$locked_storage" ]]; then
+    if [[ -n "$lockedStorage" ]]; then
         echo "Locked storage detected:"
-        echo "$locked_storage"
+        echo "$lockedStorage"
     else
         echo "No locked storage found."
     fi
 }
 
-# --- Check memory errors and usage ------------------------------------------
+###############################################################################
+# Check memory errors and usage
+###############################################################################
 check_memory_errors() {
     echo "Checking memory errors..."
-    # Filter relevant lines from dmesg
-    local memory_errors
-    memory_errors=$(dmesg | grep -iE 'memory error|out of memory|oom-killer' || true)
+    local memoryErrors
+    memoryErrors="$(dmesg | grep -iE 'memory error|out of memory|oom-killer' || true)"
 
-    # Memory usage check
-    local memory_usage
-    memory_usage=$(free -m | awk '/Mem:/ {if ($3/$2 * 100 > 90) printf "Warning: Memory usage is at %.1f%%\n", ($3/$2 * 100)}')
+    local memoryUsage
+    memoryUsage="$(free -m | awk '/Mem:/ {if ($3/$2 * 100 > 90) printf "Warning: Memory usage is at %.1f%%\n", ($3/$2 * 100)}')"
 
-    if [[ -n "$memory_errors" ]]; then
+    if [[ -n "$memoryErrors" ]]; then
         echo "Memory errors detected:"
-        echo "$memory_errors"
+        echo "$memoryErrors"
     else
         echo "No memory errors found."
     fi
 
-    if [[ -n "$memory_usage" ]]; then
+    if [[ -n "$memoryUsage" ]]; then
         echo "Memory usage warning:"
-        echo "$memory_usage"
+        echo "$memoryUsage"
         echo "Processes consuming the most memory:"
         ps -eo pid,ppid,cmd,%mem --sort=-%mem | head -n 5
     else
@@ -145,27 +104,28 @@ check_memory_errors() {
     fi
 }
 
-# --- Check CPU errors and usage ---------------------------------------------
+###############################################################################
+# Check CPU errors and usage
+###############################################################################
 check_cpu_errors() {
     echo "Checking CPU errors..."
-    local cpu_errors
-    cpu_errors=$(dmesg | grep -iE 'cpu error|thermal throttling|overheating' || true)
+    local cpuErrors
+    cpuErrors="$(dmesg | grep -iE 'cpu error|thermal throttling|overheating' || true)"
 
-    # We parse top in batch mode, then parse the %us (user) usage if it’s > 90
-    # Adjust if you prefer to check total usage instead of user usage
-    local cpu_usage
-    cpu_usage=$(top -bn1 | awk '/^%Cpu/ {if ($2 > 90) print "Warning: CPU usage is at " $2 "%"}')
+    # Parse 'top' in batch mode, check %us usage if it’s > 90
+    local cpuUsage
+    cpuUsage="$(top -bn1 | awk '/^%Cpu/ {if ($2 > 90) print "Warning: CPU usage is at " $2 "%"}')"
 
-    if [[ -n "$cpu_errors" ]]; then
+    if [[ -n "$cpuErrors" ]]; then
         echo "CPU errors detected:"
-        echo "$cpu_errors"
+        echo "$cpuErrors"
     else
         echo "No CPU errors found."
     fi
 
-    if [[ -n "$cpu_usage" ]]; then
+    if [[ -n "$cpuUsage" ]]; then
         echo "CPU usage warning:"
-        echo "$cpu_usage"
+        echo "$cpuUsage"
         echo "Processes consuming the most CPU:"
         ps -eo pid,ppid,cmd,%cpu --sort=-%cpu | head -n 5
     else
@@ -173,30 +133,33 @@ check_cpu_errors() {
     fi
 }
 
-# --- Check network errors ---------------------------------------------------
+###############################################################################
+# Check network errors
+###############################################################################
 check_network_errors() {
     echo "Checking network errors..."
-    local network_errors
-    network_errors=$(dmesg | grep -iE 'network error|link is down|nic error|carrier lost' || true)
+    local networkErrors
+    networkErrors="$(dmesg | grep -iE 'network error|link is down|nic error|carrier lost' || true)"
 
-    if [[ -n "$network_errors" ]]; then
+    if [[ -n "$networkErrors" ]]; then
         echo "Network errors detected:"
-        echo "$network_errors"
+        echo "$networkErrors"
     else
         echo "No network errors found."
     fi
 }
 
-# --- Check system logs for errors ------------------------------------------
+###############################################################################
+# Check system logs for errors
+###############################################################################
 check_system_log_errors() {
     echo "Checking system logs for errors..."
-    # We check priority=err from current boot, then filter lines containing "error" (case-insensitive)
     if command -v journalctl &>/dev/null; then
-        local syslog_errors
-        syslog_errors=$(journalctl -p err -b | grep -i 'error' || true)
-        if [[ -n "$syslog_errors" ]]; then
+        local syslogErrors
+        syslogErrors="$(journalctl -p err -b | grep -i 'error' || true)"
+        if [[ -n "$syslogErrors" ]]; then
             echo "Errors detected in system logs:"
-            echo "$syslog_errors"
+            echo "$syslogErrors"
         else
             echo "No errors found in system logs."
         fi
@@ -211,24 +174,26 @@ check_system_log_errors() {
 main() {
     echo "Starting system error check..."
 
-    # 1. Check Proxmox environment and root
-    check_proxmox_and_root
+    # Ensure this is a Proxmox node, ensure script is run as root
+    check_root
+    check_proxmox
 
-    # 2. Install or prompt for relevant commands if not found
-    #    (Some commands like 'dmesg', 'df', 'free', 'ps', and 'top' are typically core utilities
-    #     and might not have separate packages. We'll try for zfsutils, ceph-common, lvm2, and systemd.)
+    # Prompt to install packages not in a default Proxmox 8 install
+    # If user declines, relevant checks will be skipped
     if ! command -v zpool &>/dev/null; then
-      echo "ZFS tools not found (zpool). Skipping ZFS checks unless installed."
+        install_or_prompt "zfsutils-linux"
     fi
     if ! command -v ceph &>/dev/null; then
-      echo "Ceph tools not found (ceph). Skipping Ceph checks unless installed."
+        install_or_prompt "ceph-common"
     fi
     if ! command -v lvs &>/dev/null; then
-      echo "LVM tools not found (lvs). Skipping LVM lock checks unless installed."
+        install_or_prompt "lvm2"
     fi
-    # journalctl is generally part of systemd, which is standard on most PVE systems
+    if ! command -v journalctl &>/dev/null; then
+        install_or_prompt "systemd"
+    fi
 
-    # 3. Run checks
+    # Run checks
     check_storage_errors
     check_memory_errors
     check_cpu_errors
@@ -237,7 +202,7 @@ main() {
 
     echo "System error check completed!"
 
-    # 4. Prompt to remove installed packages if any were installed during this session
+    # Prompt to remove installed packages if any were installed during this session
     prompt_keep_installed_packages
 }
 

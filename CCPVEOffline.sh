@@ -15,6 +15,8 @@
 # Repo: https://github.com/coelacant1/ProxmoxScripts (for reference)
 #
 
+set -e
+
 ###############################################################################
 # CONFIG
 ###############################################################################
@@ -24,6 +26,12 @@ DISPLAY_PREFIX="cc_pve"    # How we display the "root" in the UI
 HELP_FLAG="--help"         # If your scripts support a help flag, we pass this
 LAST_SCRIPT=""             # The last script run
 LAST_OUTPUT=""             # Truncated output of the last script
+
+###############################################################################
+# IMPORT UTILITY FUNCTIONS FOR SCRIPTS
+###############################################################################
+
+source "./Utilities/Utilities.sh"
 
 ###############################################################################
 # OPTIONAL ASCII ART HEADER
@@ -330,6 +338,9 @@ navigate() {
 ###############################################################################
 # MAIN
 ###############################################################################
+
+# Begin with updating the repositories
+apt update
 
 # Start navigation from the current directory
 navigate "$BASE_DIR"

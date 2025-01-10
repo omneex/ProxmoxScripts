@@ -1,204 +1,119 @@
 #!/bin/bash
 #
-# RenameNode.sh
+# RemoveNodeCluster.sh
 #
-# This script runs on an existing Proxmox cluster node (with quorum)
-# and renames another node from <oldnode> to <newnode>.
-#
-# Steps:
-#   1) Verify no VMs/LXCs on <oldnode>.
-#   2) pvecm delnode <oldnode> (remove from cluster membership).
-#   3) Clean up cluster references (SSH known hosts, /etc/pve/nodes/<oldnode>, etc.).
-#   4) SSH into <oldnode> and rename to <newnode>, remove cluster config, reboot.
+# Safely remove a node from a Proxmox cluster by:
+#   - Checking if the node has VMs/containers, and refusing removal unless --force is given.
+#   - Calling 'pvecm delnode' to remove the node from the cluster membership.
+#   - Removing SSH references and /etc/pve/nodes/<NODE_NAME> directories from all remaining nodes.
+#   - Allowing a future re-add of a node with the same name without leftover SSH conflicts.
 #
 # Usage:
-#   ./RenameNode.sh <oldnodename> <newnodename>
+#   ./RemoveNodeCluster.sh [--force] <node_name>
 #
-# Requirements:
-#   - You should have SSH access from this cluster node to <oldnode>.
-#   - The cluster node running this script should have 'pvecm' and 'pvesh'.
-#   - <oldnode> must NOT have VMs or containers (or script will refuse).
-#   - The cluster must have quorum (especially if more than 2 nodes).
+# Examples:
+#   # Normal removal, will refuse if the node has VMs/LXCs:
+#   ./RemoveNodeCluster.sh node3
 #
-# After reboot, <oldnode> is now <newnode> and is standalone. You can re-add it
-# to the cluster with "pvecm add <existing-cluster-IP>" or your own join script.
-
-set -e
-
-# ---------------------------------------------------------------------------
-# @function find_utilities_script
-# @description
-#   Finds the root directory of the scripts folder by traversing upward until
-#   it finds a folder containing a Utilities subfolder.
-#   Returns the full path to Utilities/Utilities.sh if found, or exits with an
-#   error if not found within 15 levels.
-# ---------------------------------------------------------------------------
-find_utilities_script() {
-  # Check current directory first
-  if [[ -d "./Utilities" ]]; then
-    echo "./Utilities/Utilities.sh"
-    return 0
-  fi
-
-  local rel_path=""
-  for _ in {1..15}; do
-    cd ..
-    # If rel_path is empty, set it to '..' else prepend '../'
-    if [[ -z "$rel_path" ]]; then
-      rel_path=".."
-    else
-      rel_path="../$rel_path"
-    fi
-
-    if [[ -d "./Utilities" ]]; then
-      echo "$rel_path/Utilities/Utilities.sh"
-      return 0
-    fi
-  done
-
-  echo "Error: Could not find 'Utilities' folder within 15 levels." >&2
-  return 1
-}
-
-# ---------------------------------------------------------------------------
-# Locate and source the Utilities script
-# ---------------------------------------------------------------------------
-UTILITIES_SCRIPT="$(find_utilities_script)" || exit 1
-source "$UTILITIES_SCRIPT"
+#   # Force removal, ignoring the presence of VMs/LXCs:
+#   ./RemoveNodeCluster.sh --force node3
+#
 
 ###############################################################################
-# Preliminary Checks via Utilities
+# Preliminary Checks
 ###############################################################################
-check_proxmox_and_root         # Ensure we're root on a valid Proxmox node
-install_or_prompt "jq"         # Needed to parse JSON from pvesh
-install_or_prompt "ssh"        # Required to SSH into old node
-check_cluster_membership       # Ensure we have a recognized cluster membership
+check_root
+check_proxmox
 
-# Prompt to optionally remove newly installed packages upon script exit
+# 'jq' is not installed by default on Proxmox 8; prompt user to install if missing.
+install_or_prompt "jq"
+
+# Verify this node is part of a cluster.
+check_cluster_membership
+
+# At script exit, optionally remove newly installed packages.
 trap prompt_keep_installed_packages EXIT
 
 ###############################################################################
-# Helper: Usage
+# Usage Function
 ###############################################################################
 usage() {
-  echo "Usage: $0 <oldnode> <newnode>"
+  echo "Usage: $0 [--force] <node_name>"
+  echo "  --force   Allow removal even if the node has VMs/containers."
   exit 1
 }
 
 ###############################################################################
-# Parse Arguments
+# Argument Parsing
 ###############################################################################
-OLDNODE="$1"
-NEWNODE="$2"
-if [[ -z "$OLDNODE" || -z "$NEWNODE" ]]; then
+FORCE=0
+if [[ "$1" == "--force" ]]; then
+  FORCE=1
+  shift
+fi
+
+NODE_NAME="$1"
+if [[ -z "${NODE_NAME}" ]]; then
   usage
 fi
 
-echo "Renaming Proxmox node from '$OLDNODE' to '$NEWNODE'..."
-
 ###############################################################################
-# 1) Check if <oldnode> has VMs or containers
+# Check for VMs or containers on this node (unless --force)
 ###############################################################################
-echo "Checking for VMs or containers on '$OLDNODE'..."
-VM_LIST=$(
-  pvesh get /cluster/resources --type vm --output-format json 2>/dev/null \
-  | jq -r --arg N "$OLDNODE" '.[] | select(.node == $N) | "VMID:\(.vmid) Type:\(.type)"'
-)
+if [[ "${FORCE}" -ne 1 ]]; then
+  echo "Checking for VMs/containers on node \"${NODE_NAME}\"..."
 
-if [[ -n "$VM_LIST" ]]; then
-  echo "Error: The following VMs/containers are still on node '$OLDNODE':"
-  echo "$VM_LIST"
-  echo "Please migrate or remove them first before renaming."
-  exit 3
+  # Query cluster resources for type=vm (includes QEMU + LXC) and filter by node name
+  VMS_ON_NODE=$(
+    pvesh get /cluster/resources --type vm --output-format json 2>/dev/null \
+    | jq -r --arg N "${NODE_NAME}" '.[] | select(.node == $N) | "\(.type) \(.vmid)"'
+  )
+
+  if [[ -n "${VMS_ON_NODE}" ]]; then
+    echo "Error: The following VMs/containers still reside on node \"${NODE_NAME}\":"
+    echo "${VMS_ON_NODE}"
+    echo
+    echo "Please migrate or remove them first, or re-run with --force to override."
+    exit 3
+  fi
 fi
 
 ###############################################################################
-# 2) Remove <oldnode> from cluster membership
+# Main Script Logic
 ###############################################################################
-echo "Removing node '$OLDNODE' from the cluster..."
-if ! pvecm delnode "$OLDNODE"; then
-  echo "Warning: 'pvecm delnode' may fail if '$OLDNODE' was already removed."
-  echo "Continuing cleanup..."
+echo "=== Removing node \"${NODE_NAME}\" from the cluster ==="
+
+# 1) Remove node from the Corosync membership
+echo "Running: pvecm delnode ${NODE_NAME}"
+if ! pvecm delnode "${NODE_NAME}"; then
+  echo "Warning: 'pvecm delnode' may fail if the node isn't recognized or is already removed."
+  echo "Continuing with SSH cleanup..."
 fi
 
-###############################################################################
-# 3) Clean up cluster references to <oldnode>
-###############################################################################
-# Remove /etc/pve/nodes/<oldnode> if it still exists locally.
-LOCAL_OLDNODE_DIR="/etc/pve/nodes/$OLDNODE"
-if [[ -d "$LOCAL_OLDNODE_DIR" ]]; then
-  echo "Removing local cluster dir $LOCAL_OLDNODE_DIR ..."
-  rm -rf "$LOCAL_OLDNODE_DIR"
+# 2) Remove /etc/pve/nodes/<NODE_NAME> locally if it exists
+if [[ -d "/etc/pve/nodes/${NODE_NAME}" ]]; then
+  echo "Removing local /etc/pve/nodes/${NODE_NAME} ..."
+  rm -rf "/etc/pve/nodes/${NODE_NAME}"
 fi
 
-# Also remove SSH known_hosts references to <oldnode> on this node
-echo "Removing '$OLDNODE' from local known_hosts..."
-ssh-keygen -R "$OLDNODE" 2>/dev/null || true
-ssh-keygen -R "${OLDNODE}.local" 2>/dev/null || true
+# 3) Clean SSH references on remaining cluster nodes
+ONLINE_NODES=$(pvecm nodes | awk '{print $3}')
+echo "Cleaning SSH references on other cluster nodes..."
+for host in ${ONLINE_NODES}; do
+  # Skip if it's the removed node or blank
+  [[ "${host}" == "${NODE_NAME}" ]] && continue
+  [[ -z "${host}" ]] && continue
 
-# Optionally remove from /etc/ssh/ssh_known_hosts
-if [[ -f /etc/ssh/ssh_known_hosts ]]; then
-  sed -i "/$OLDNODE/d" /etc/ssh/ssh_known_hosts || true
-fi
-
-###############################################################################
-# 4) SSH into <oldnode>, rename system to <newnode>, remove local cluster config, reboot
-###############################################################################
-echo
-echo "Now SSHing into '$OLDNODE' to rename it to '$NEWNODE' and remove local cluster config..."
-SSH_CMD="ssh -o StrictHostKeyChecking=no root@${OLDNODE}"
-
-# We'll run a sequence of commands on <oldnode>:
-read -r -d '' REMOTE_SCRIPT <<EOF
-#!/bin/bash
-set -e
-
-echo "Setting hostname to '$NEWNODE'..."
-hostnamectl set-hostname "$NEWNODE"
-
-# If you rely on /etc/hosts, update it. We'll do a simple in-place replace:
-if grep -q "$OLDNODE" /etc/hosts; then
-  echo "Replacing '$OLDNODE' with '$NEWNODE' in /etc/hosts..."
-  sed -i "s/$OLDNODE/$NEWNODE/g" /etc/hosts
-fi
-
-echo "Stopping cluster services on '$OLDNODE'..."
-systemctl stop corosync || true
-systemctl stop pve-cluster || true
-
-echo "Removing local corosync config..."
-rm -f /etc/pve/corosync.conf 2>/dev/null || true
-rm -rf /etc/corosync/* 2>/dev/null || true
-
-echo "Removing local /etc/pve/nodes/$OLDNODE..."
-rm -rf /etc/pve/nodes/$OLDNODE 2>/dev/null || true
-
-echo "Restarting pve-cluster in standalone mode..."
-systemctl start pve-cluster || true
-
-echo "Disabling corosync from autostart..."
-systemctl disable corosync || true
-systemctl stop corosync || true
+  echo ">>> On node \"${host}\"..."
+  ssh "root@${host}" "ssh-keygen -R '${NODE_NAME}' >/dev/null 2>&1 || true"
+  ssh "root@${host}" "ssh-keygen -R '${NODE_NAME}.local' >/dev/null 2>&1 || true"
+  ssh "root@${host}" "sed -i '/${NODE_NAME}/d' /etc/ssh/ssh_known_hosts 2>/dev/null || true"
+  ssh "root@${host}" "rm -rf /etc/pve/nodes/${NODE_NAME} 2>/dev/null || true"
+done
 
 echo
-echo "Rebooting now to finalize rename..."
-sleep 2
-reboot
-EOF
-
-echo "============================================================="
-echo " Running remote rename + cleanup commands on '$OLDNODE'..."
-echo "============================================================="
-if ! echo "$REMOTE_SCRIPT" | $SSH_CMD bash; then
-  echo
-  echo "ERROR: Remote script failed. Please check connectivity or logs on '$OLDNODE'."
-  exit 4
-fi
-
+echo "=== Done ==="
+echo "Node \"${NODE_NAME}\" has been removed from the cluster."
+echo "All known SSH references on remaining cluster nodes have been cleaned."
 echo
-echo "============================================================="
-echo " The node '$OLDNODE' is rebooting and will come up as '$NEWNODE'."
-echo " After it boots, it will be a standalone Proxmox host named '$NEWNODE'."
-echo
-echo " You can re-add it to a cluster with your usual 'pvecm add' steps or scripts."
-echo "============================================================="
+echo "You may now safely re-add a new server with the same name (\"${NODE_NAME}\") in the future."
