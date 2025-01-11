@@ -19,7 +19,7 @@
 #   ./RemoveClusterNode.sh --force node3
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Preliminary Checks
@@ -32,9 +32,6 @@ install_or_prompt "jq"
 
 # Verify this node is part of a cluster.
 check_cluster_membership
-
-# At script exit, optionally remove newly installed packages.
-trap prompt_keep_installed_packages EXIT
 
 ###############################################################################
 # Usage Function
@@ -141,6 +138,9 @@ echo "All known SSH references on remaining cluster nodes have been cleaned."
 echo
 echo "You may now safely re-add a new server with the same name (\"${NODE_NAME}\") in the future."
 
+
+# At script exit, optionally remove newly installed packages.
+prompt_keep_installed_packages
 
 ###############################################################################
 # Testing status

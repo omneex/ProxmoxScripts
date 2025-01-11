@@ -1,84 +1,84 @@
 #!/bin/bash
 #
-# UpdateLXCNotesWithIP.sh
+# UpdateNotesWithIP.sh
 #
-# This script retrieves the IP address of each LXC container in the Proxmox VE cluster
-# and updates/appends this information to the notes field of the respective container.
-# If the container does not provide an IP via 'pct exec', it attempts
-# to scan the network for the IP based on the container's MAC address.
+# This script retrieves the IP address of each LXC container in the local Proxmox VE node
+# and updates/appends this information to the description field of the respective container.
+# If the container does not provide an IP via 'pct exec', it attempts to scan the network
+# for the IP based on the container's MAC address.
 #
-# If the notes already contain an "IP Address:" line, that line is updated; otherwise,
+# If the description already contains an "IP Address:" line, that line is updated; otherwise,
 # the IP Address line is appended.
 #
 # Usage:
-#   ./UpdateLXCNotesWithIP.sh
+#   ./UpdateNotesWithIP.sh
 #
-# Changes:
-# V1.1: Fixed mixup between pct and qm, changed to description instead of notes
+# Example:
+#   # Updates all local LXC containers' descriptions with the discovered IP address
+#   ./UpdateNotesWithIP.sh
 #
 
-# Loop through all LXC containers in the cluster
-CT_IDS=$(pct list | awk 'NR>1 {print $1}')
+source "$UTILITIES"
 
-for CTID in $CT_IDS; do
-    echo "Processing LXC container ID: $CTID"
+###############################################################################
+# Environment Checks
+###############################################################################
+check_root
+check_proxmox
 
-    # Attempt to retrieve IP with 'pct exec'
-    # We'll try "ip -o -4 addr list eth0" inside the container
-    IP_ADDRESS=$(pct exec "$CTID" -- bash -c "ip -o -4 addr list eth0 | awk '{print \$4}' | cut -d/ -f1" 2>/dev/null)
+###############################################################################
+# Dependency Checks
+###############################################################################
+install_or_prompt "nmap"
 
-    if [ -z "$IP_ADDRESS" ]; then
-        echo " - Unable to retrieve IP address via pct exec for container $CTID."
+###############################################################################
+# Main Logic
+###############################################################################
+readarray -t containerIds < <( pct list | awk 'NR>1 {print $1}' )
 
-        # Retrieve MAC address from container config
-        # Typically in the format: net0: name=eth0,bridge=vmbr0,hwaddr=DE:AD:BE:EF:00:01
-        MAC_ADDRESS=$(pct config "$CTID" | grep -E '^net\d+: ' | grep -oP 'hwaddr=\K[^,]+')
-        if [ -z "$MAC_ADDRESS" ]; then
-            echo " - Could not retrieve MAC address for container $CTID. Skipping."
-            continue
-        fi
-        echo " - Retrieved MAC address: $MAC_ADDRESS"
+for ctId in "${containerIds[@]}"; do
+  echo "Processing LXC container ID: \"$ctId\""
 
-        # Identify the bridge or VLAN (bridge=vmbrX)
-        VLAN=$(pct config "$CTID" | grep -E '^net\d+: ' | grep -oP 'bridge=\K\S+')
-        if [ -z "$VLAN" ]; then
-            echo " - Unable to retrieve VLAN/bridge info for container $CTID. Skipping."
-            continue
-        fi
-        echo " - Retrieved VLAN/bridge: $VLAN"
-
-        # Attempt to find IP with nmap scan
-        IP_ADDRESS=$(nmap -sn -oG - "$VLAN" 2>/dev/null | grep -i "$MAC_ADDRESS" | awk '{print $2}')
-        if [ -z "$IP_ADDRESS" ]; then
-            IP_ADDRESS="Could not determine IP address"
-            echo " - Unable to determine IP via VLAN scan for container $CTID."
-        else
-            echo " - Retrieved IP address via VLAN scan: $IP_ADDRESS"
-        fi
+  ipAddress=$(pct exec "$ctId" -- bash -c "ip -o -4 addr list eth0 | awk '{print \$4}' | cut -d/ -f1" 2>/dev/null)
+  if [ -z "$ipAddress" ]; then
+    echo " - Unable to retrieve IP address via pct exec for container \"$ctId\"."
+    macAddress=$(pct config "$ctId" | grep -E '^net[0-9]+: ' | grep -oP 'hwaddr=\K[^,]+')
+    if [ -z "$macAddress" ]; then
+      echo " - Could not retrieve MAC address for container \"$ctId\". Skipping."
+      continue
+    fi
+    vlan=$(pct config "$ctId" | grep -E '^net[0-9]+: ' | grep -oP 'bridge=\K\S+')
+    if [ -z "$vlan" ]; then
+      echo " - Unable to retrieve VLAN/bridge info for container \"$ctId\". Skipping."
+      continue
+    fi
+    ipAddress=$(nmap -sn -oG - "$vlan" 2>/dev/null | grep -i "$macAddress" | awk '{print $2}')
+    if [ -z "$ipAddress" ]; then
+      ipAddress="Could not determine IP address"
+      echo " - Unable to determine IP via VLAN scan for container \"$ctId\"."
     else
-        echo " - Retrieved IP address via pct exec: $IP_ADDRESS"
+      echo " - Retrieved IP address via VLAN scan: \"$ipAddress\""
     fi
+  else
+    echo " - Retrieved IP address via pct exec: \"$ipAddress\""
+  fi
 
-    # Get existing notes from the container config
-    EXISTING_NOTES=$(pct config "$CTID" | sed -n 's/^notes: //p')
+  existingNotes=$(pct config "$ctId" | sed -n 's/^notes: //p')
+  if [ -z "$existingNotes" ]; then
+    existingNotes=""
+  fi
 
-    if [ -z "$EXISTING_NOTES" ]; then
-        EXISTING_NOTES=""
-    fi
+  if echo "$existingNotes" | grep -q "^IP Address:"; then
+    updatedNotes=$(echo "$existingNotes" | sed -E "s|^IP Address:.*|IP Address: $ipAddress|")
+  else
+    updatedNotes="${existingNotes}<br/>IP Address: $ipAddress"
+  fi
 
-    # Check if there's an "IP Address:" line already
-    if echo "$EXISTING_NOTES" | grep -q "^IP Address:"; then
-        # Update that line
-        UPDATED_NOTES=$(echo "$EXISTING_NOTES" | sed -E "s|^IP Address:.*|IP Address: $IP_ADDRESS|")
-    else
-        # Append new line
-        UPDATED_NOTES="${EXISTING_NOTES}<br/>IP Address: $IP_ADDRESS"
-    fi
-
-    # Update container notes
-    pct set "$CTID" --description  "$UPDATED_NOTES"
-    echo " - Updated description  for container $CTID"
-    echo
+  pct set "$ctId" --description "$updatedNotes"
+  echo " - Updated description for container \"$ctId\""
+  echo
 done
 
-echo "=== LXC container description  update process completed! ==="
+echo "=== LXC container description update process completed! ==="
+
+prompt_keep_installed_packages

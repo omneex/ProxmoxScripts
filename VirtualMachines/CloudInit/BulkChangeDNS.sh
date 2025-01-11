@@ -4,7 +4,7 @@
 # It allows you to set new DNS settings for each VM and regenerates the Cloud-Init image to apply the changes.
 #
 # Usage:
-# ./UpdateVMDNS.sh <start_vm_id> <end_vm_id> <dns_server> <dns_search_domain>
+# ./BulkChangeDNS.sh <start_vm_id> <end_vm_id> <dns_server> <dns_search_domain>
 #
 # Arguments:
 #   start_vm_id - The ID of the first VM to update.
@@ -13,7 +13,7 @@
 #   dns_search_domain - The DNS search domain to be set for the VM.
 #
 # Example:
-#   ./UpdateVMDNS.sh 400 430 8.8.8.8 example.com
+#   ./BulkChangeDNS.sh 400 430 8.8.8.8 example.com
 
 # Check if the minimum required parameters are provided
 if [ "$#" -ne 4 ]; then

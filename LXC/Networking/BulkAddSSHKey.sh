@@ -2,71 +2,63 @@
 #
 # BulkAddSSHKey.sh
 #
-# This script *appends* an SSH public key to the root user's authorized_keys
-# for a range of LXC containers (no existing keys are removed).
+# This script appends an SSH public key to the root user's authorized_keys
+# for a specified range of LXC containers (no existing keys are removed).
 #
 # Usage:
-#   ./BulkAddSSHKey.sh <start_ct_id> <num_cts> "<ssh_public_key>"
+#   ./BulkAddSSHKey.sh <start_ct_id> <end_ct_id> "<ssh_public_key>"
 #
 # Example:
-#   ./BulkAddSSHKey.sh 400 3 "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ..."
-#   This will append the specified key to containers 400..402.
+#   ./BulkAddSSHKey.sh 400 402 "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ..."
 #
 # Notes:
-#   - The containers must be *running* for 'pct exec' to work.
-#   - If you want to add keys for another user, replace '/root/.ssh' with their home directory.
-#   - Must be run as root on a Proxmox node.
+#   - Containers must be running for 'pct exec' to succeed.
+#   - If you want to add keys for another user, replace '/root/.ssh' with that user’s home directory.
+#   - This script must be run as root on a Proxmox node.
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # MAIN
 ###############################################################################
 
-# --- Parse arguments -------------------------------------------------------
+# Parse arguments
 if [[ $# -ne 3 ]]; then
-  echo "Usage: $0 <start_ct_id> <num_cts> \"<ssh_public_key>\""
+  echo "Usage: $0 <start_ct_id> <end_ct_id> \"<ssh_public_key>\""
   echo "Example:"
-  echo "  $0 400 3 \"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ...\""
+  echo "  $0 400 402 \"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ...\""
   exit 1
 fi
 
-local start_ct_id="$1"
-local num_cts="$2"
-local ssh_key="$3"
+startCtId="$1"
+endCtId="$2"
+sshKey="$3"
 
-# --- Basic checks ----------------------------------------------------------
-check_proxmox_and_root  # Must be root and on a Proxmox node
+# Basic checks
+check_root
+check_proxmox
 
-# If a cluster check is needed, uncomment:
-# check_cluster_membership
+echo "=== Starting SSH key addition for containers from \"$startCtId\" to \"$endCtId\" ==="
+echo " - SSH key to append: \"$sshKey\""
 
-# --- Display summary -------------------------------------------------------
-echo "=== Starting SSH key addition for $num_cts container(s) ==="
-echo " - Starting container ID: $start_ct_id"
-echo " - SSH key to append: $ssh_key"
-
-# --- Main Loop -------------------------------------------------------------
-for (( i=0; i<num_cts; i++ )); do
-  local current_ct_id=$(( start_ct_id + i ))
-
-  # Check if container exists
-  if pct config "$current_ct_id" &>/dev/null; then
-    echo "Adding SSH key to container $current_ct_id..."
-    pct exec "$current_ct_id" -- bash -c "
-      mkdir -p /root/.ssh && \
-      chmod 700 /root/.ssh && \
-      echo \"$ssh_key\" >> /root/.ssh/authorized_keys && \
+# Main loop
+for (( ctId=startCtId; ctId<=endCtId; ctId++ )); do
+  if pct config "$ctId" &>/dev/null; then
+    echo "Adding SSH key to container \"$ctId\"..."
+    pct exec "$ctId" -- bash -c "
+      mkdir -p /root/.ssh &&
+      chmod 700 /root/.ssh &&
+      echo \"$sshKey\" >> /root/.ssh/authorized_keys &&
       chmod 600 /root/.ssh/authorized_keys
     "
     if [[ $? -eq 0 ]]; then
-      echo " - Successfully appended SSH key for CT $current_ct_id."
+      echo " - Successfully appended SSH key for CT \"$ctId\"."
     else
-      echo " - Failed to append SSH key for CT $current_ct_id (container stopped or other error?)."
+      echo " - Failed to append SSH key for CT \"$ctId\" (container stopped or other error?)."
     fi
   else
-    echo " - Container $current_ct_id does not exist. Skipping."
+    echo " - Container \"$ctId\" does not exist. Skipping."
   fi
 done
 

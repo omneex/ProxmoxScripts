@@ -3,7 +3,7 @@
 # This script sets the amount of memory allocated to a range of virtual machines (VMs) within a Proxmox VE environment.
 #
 # Usage:
-# ./SetMemoryConfig.sh <start_vm_id> <end_vm_id> <memory_size>
+# ./BulkSetMemoryConfig.sh <start_vm_id> <end_vm_id> <memory_size>
 #
 # Arguments:
 #   start_vm_id - The ID of the first VM to update.
@@ -11,7 +11,7 @@
 #   memory_size - The amount of memory (in MB) to allocate to each VM.
 #
 # Example:
-#   ./SetMemoryConfig.sh 400 430 8192
+#   ./BulkSetMemoryConfig.sh 400 430 8192
 
 # Check if the required parameters are provided
 if [ "$#" -ne 3 ]; then

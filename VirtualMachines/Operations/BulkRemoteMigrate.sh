@@ -5,7 +5,7 @@
 # The script removes any existing Cloud-Init drives before initiating the migration and adjusts VM IDs based on a provided offset.
 #
 # Usage:
-# ./RemoteMigrateVMs.sh <target_host> <api_token> <fingerprint> <target_storage> <vm_offset> <target_network>
+# ./BulkRemoteMigrate.sh <target_host> <api_token> <fingerprint> <target_storage> <vm_offset> <target_network>
 # Where:
 #   target_host - The hostname or IP address of the target Proxmox server.
 #   api_token - The API token used for authentication.

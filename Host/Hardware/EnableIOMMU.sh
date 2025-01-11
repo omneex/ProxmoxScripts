@@ -22,7 +22,7 @@
 #     specific PCI device IDs as needed.
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Preliminary Checks

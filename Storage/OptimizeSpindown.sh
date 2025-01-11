@@ -6,40 +6,40 @@
 # as well as a method to uninstall hdparm and remove the service, reverting to default.
 #
 # Usage:
-#   Install/Configure:
-#     ./OptimizeSpindown.sh <time_in_minutes> <device_path1> [<device_path2> ...]
+#   # Install/Configure:
+#   ./OptimizeSpindown.sh <time_in_minutes> <device_path1> [<device_path2> ...]
 #
-#   Uninstall (removes hdparm, spindown service, and helper script):
-#     ./OptimizeSpindown.sh uninstall
-#
-# Examples:
-#   ./OptimizeSpindown.sh 15 /dev/sda /dev/sdb
+#   # Uninstall (removes hdparm, spindown service, and helper script):
 #   ./OptimizeSpindown.sh uninstall
 #
-# Notes:
-#   - For spindown values up to 20 minutes, the script uses minutes * 12 for hdparm -S.
-#   - For more than 20 minutes, the script clamps to 241 (~30 minutes).
-#   - Must be run as root (sudo).
-#   - The script sets up a systemd service to run once at boot and apply the hdparm settings.
-#   - Running this script with 'uninstall' will remove hdparm, the systemd service, and the helper script.
+# Examples:
+#   # Set a 15-minute spindown for /dev/sda and /dev/sdb
+#   ./OptimizeSpindown.sh 15 /dev/sda /dev/sdb
+#
+#   # Uninstall and remove all changes
+#   ./OptimizeSpindown.sh uninstall
+#
 
-set -e
+source "$UTILITIES"
 
-# --- Constants ---------------------------------------------------------------
+###############################################################################
+# Global Variables
+###############################################################################
 HELPER_SCRIPT="/usr/bin/spindown-logic.sh"
 SERVICE_FILE="/etc/systemd/system/spindown.service"
 
-# --- Check if running as root ------------------------------------------------
-if [[ $EUID -ne 0 ]]; then
-  echo "Error: This script must be run as root (sudo)."
-  exit 1
-fi
+###############################################################################
+# Main
+###############################################################################
+check_root  # Ensure the script is run as root
 
-# --- Uninstall Mode ----------------------------------------------------------
+###############################################################################
+# Uninstall Mode
+###############################################################################
 if [[ "$1" == "uninstall" ]]; then
   echo "Uninstall mode selected. Reverting changes..."
 
-  # Stop and disable the service
+  # Stop and disable the service if it exists
   if systemctl is-enabled spindown.service &>/dev/null; then
     systemctl stop spindown.service || true
     systemctl disable spindown.service || true
@@ -48,19 +48,18 @@ if [[ "$1" == "uninstall" ]]; then
   # Remove the systemd service file
   if [[ -f "$SERVICE_FILE" ]]; then
     rm -f "$SERVICE_FILE"
-    echo "Removed $SERVICE_FILE"
+    echo "Removed \"$SERVICE_FILE\""
   fi
 
   # Remove the helper script
   if [[ -f "$HELPER_SCRIPT" ]]; then
     rm -f "$HELPER_SCRIPT"
-    echo "Removed $HELPER_SCRIPT"
+    echo "Removed \"$HELPER_SCRIPT\""
   fi
 
   # Remove hdparm if installed
   if command -v hdparm &>/dev/null; then
     echo "Removing hdparm..."
-    # Adjust to your package manager as needed (apt, yum, etc.)
     apt-get remove -y hdparm || echo "Warning: Could not remove hdparm automatically."
   fi
 
@@ -69,19 +68,14 @@ if [[ "$1" == "uninstall" ]]; then
   exit 0
 fi
 
-# --- Installation Mode -------------------------------------------------------
-if ! command -v hdparm &>/dev/null; then
-  echo "Installing hdparm..."
-  # Adjust to your package manager as needed (apt, yum, etc.)
-  apt-get update -y
-  apt-get install -y hdparm
-fi
-
-# --- Usage / Argument Parsing ------------------------------------------------
+###############################################################################
+# Installation Mode
+###############################################################################
+# Check if the correct arguments are provided
 if [[ $# -lt 2 ]]; then
   echo "Usage:"
-  echo "  $0 <time_in_minutes> <device_path1> [<device_path2> ...]"
-  echo "  $0 uninstall"
+  echo "  \"$0\" <time_in_minutes> <device_path1> [<device_path2> ...]"
+  echo "  \"$0\" uninstall"
   exit 2
 fi
 
@@ -89,22 +83,33 @@ SPINDOWN_MINUTES="$1"
 shift
 DEVICES=("$@")
 
-# Simple validation that SPINDOWN_MINUTES is a positive integer
+# Validate SPINDOWN_MINUTES
 if ! [[ "$SPINDOWN_MINUTES" =~ ^[0-9]+$ ]]; then
   echo "Error: <time_in_minutes> must be a positive integer."
   exit 3
 fi
 
-# --- Convert minutes to hdparm -S value --------------------------------------
-# For 1-20 minutes, we use (minutes * 12).
-# For > 20 minutes, clamp to 241 (which is ~30 minutes).
+# Install hdparm if missing
+install_or_prompt "hdparm" || {
+  echo "Error: 'hdparm' is required but cannot be installed."
+  exit 4
+}
+
+# Prompt whether to keep newly installed packages at the end
+prompt_keep_installed_packages
+
+###############################################################################
+# Convert Minutes to hdparm -S Value
+###############################################################################
 if [[ "$SPINDOWN_MINUTES" -le 20 ]]; then
-  HDPARM_VALUE=$((SPINDOWN_MINUTES * 12))
+  HDPARM_VALUE=$(( SPINDOWN_MINUTES * 12 ))
 else
   HDPARM_VALUE=241
 fi
 
-# --- Create the helper script in /usr/bin ------------------------------------
+###############################################################################
+# Create Helper Script
+###############################################################################
 cat <<EOF > "$HELPER_SCRIPT"
 #!/bin/bash
 #
@@ -118,15 +123,15 @@ set -e
 echo "Applying hdparm spindown settings..."
 EOF
 
-for DEV in "${DEVICES[@]}"; do
-  cat <<EOF >> "$HELPER_SCRIPT"
-hdparm -S $HDPARM_VALUE "$DEV" || echo "Warning: Failed to set spindown on $DEV"
-EOF
+for devPath in "${DEVICES[@]}"; do
+  echo "hdparm -S $HDPARM_VALUE \"$devPath\" || echo \"Warning: Failed to set spindown on $devPath\"" >> "$HELPER_SCRIPT"
 done
 
 chmod +x "$HELPER_SCRIPT"
 
-# --- Create a systemd service to run once at boot ----------------------------
+###############################################################################
+# Create Systemd Service
+###############################################################################
 cat <<EOF > "$SERVICE_FILE"
 [Unit]
 Description=Spin down drives after idle time
@@ -145,8 +150,11 @@ systemctl daemon-reload
 systemctl enable spindown.service
 systemctl start spindown.service
 
+###############################################################################
+# Final Output
+###############################################################################
 echo "Spindown service installed and started."
-echo "Drives: ${DEVICES[*]}"
-echo "Spindown time (minutes): $SPINDOWN_MINUTES"
-echo "hdparm -S value used: $HDPARM_VALUE"
+echo "Drives: \"${DEVICES[*]}\""
+echo "Spindown time (minutes): \"$SPINDOWN_MINUTES\""
+echo "hdparm -S value used: \"$HDPARM_VALUE\""
 echo "Done."

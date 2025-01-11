@@ -3,14 +3,14 @@
 # This script starts a range of virtual machines (VMs) within a Proxmox VE environment.
 #
 # Usage:
-# ./StartVMs.sh <first_vm_id> <last_vm_id>
+# ./BulkStart.sh <first_vm_id> <last_vm_id>
 #
 # Arguments:
 #   first_vm_id - The ID of the first VM to start.
 #   last_vm_id - The ID of the last VM to start.
 #
 # Example:
-#   ./StartVMs.sh 400 430
+#   ./BulkStart.sh 400 430
 
 # Check if the required parameters are provided
 if [ "$#" -ne 2 ]; then

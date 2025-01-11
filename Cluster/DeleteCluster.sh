@@ -14,7 +14,7 @@
 #   - This process is DESTRUCTIVE and will remove cluster configuration.
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Preliminary Checks

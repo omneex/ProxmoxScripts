@@ -11,57 +11,70 @@
 #   # Uninstall locally:
 #   ./CephScrubScheduler.sh local uninstall <pool_name>
 #
-#   # Install on a remote VM:
-#   ./CephScrubScheduler.sh remote install <vm_host> <vm_user> <vm_pass> <pool_name> <schedule_type> [time]
+#   # Install on a remote node (must provide a valid Proxmox cluster node name, not DNS):
+#   ./CephScrubScheduler.sh remote install <node_name> <vm_user> <vm_pass> <pool_name> <schedule_type> [time]
 #
-#   # Uninstall on a remote VM:
-#   ./CephScrubScheduler.sh remote uninstall <vm_host> <vm_user> <vm_pass> <pool_name>
+#   # Uninstall on a remote node:
+#   ./CephScrubScheduler.sh remote uninstall <node_name> <vm_user> <vm_pass> <pool_name>
 #
 # Example schedule_type/time combos:
 #   - daily 02:30
-#   - 12h       (no time needed)
-#   - 6h        (no time needed)
+#   - 12h
+#   - 6h
 #   - weekly Sun 04:00
 #
-# On install:
-#   1) Disables automatic scrubbing on <pool_name> by setting intervals to 30 days.
-#   2) Installs systemd service + timer to manually deep-scrub at the specified schedule.
+# This script:
+#   1) Disables automatic scrubbing on <pool_name> by setting long intervals.
+#   2) Sets up or removes a systemd service/timer that periodically deep-scrubs the pool.
 #
-# On uninstall:
-#   1) Removes the systemd service + timer + scrub script.
-#   2) Reverts the pool’s scrubbing intervals to "defaults" you define below.
+source "$UTILITIES"
+
+###############################################################################
+# ENVIRONMENT CHECKS
+###############################################################################
+check_root
+check_proxmox
+
+###############################################################################
+# INSTALL REQUIRED PACKAGES (IF NEEDED)
+###############################################################################
+SCRIPT_MODE="$1"
+ACTION="$2"
+
+# Decide which utilities to ensure based on mode
+if [[ "$SCRIPT_MODE" == "local" ]]; then
+  install_or_prompt "jq"
+elif [[ "$SCRIPT_MODE" == "remote" ]]; then
+  install_or_prompt "jq"
+  install_or_prompt "sshpass"
+fi
 
 ###############################################################################
 # CONFIG / DEFAULTS
 ###############################################################################
-
-# Large interval to effectively disable auto-scrubbing:
 DISABLE_SCRUB_SECONDS=2592000  # 30 days
-# "Default" intervals to revert to on uninstall (adjust to your cluster’s normal):
-DEFAULT_SCRUB_MIN=86400   # 24h
-DEFAULT_SCRUB_MAX=604800  # 7 days
-DEFAULT_DEEP_SCRUB=604800 # 7 days
-
-# Where the local script is placed:
+DEFAULT_SCRUB_MIN=86400        # 24h
+DEFAULT_SCRUB_MAX=604800       # 7 days
+DEFAULT_DEEP_SCRUB=604800      # 7 days
 SCRUB_SCRIPT_DIR="/usr/local/bin"
 SYSTEMD_DIR="/etc/systemd/system"
 
 ###############################################################################
-# HELPER: Check usage
+# HELPER: Print usage
 ###############################################################################
 function usage() {
   echo "Usage:"
-  echo "  LOCAL INSTALL:   $0 local install <pool_name> <schedule_type> [time]"
-  echo "  LOCAL UNINSTALL: $0 local uninstall <pool_name>"
+  echo "  Local Install:   $0 local install <pool_name> <schedule_type> [time]"
+  echo "  Local Uninstall: $0 local uninstall <pool_name>"
   echo
-  echo "  REMOTE INSTALL:  $0 remote install <host> <user> <pass> <pool_name> <schedule_type> [time]"
-  echo "  REMOTE UNINSTALL:$0 remote uninstall <host> <user> <pass> <pool_name>"
+  echo "  Remote Install:  $0 remote install <node_name> <vm_user> <vm_pass> <pool_name> <schedule_type> [time]"
+  echo "  Remote Uninstall:$0 remote uninstall <node_name> <vm_user> <vm_pass> <pool_name>"
   echo
   echo "Schedule Types:"
-  echo "  daily <HH:MM>   (e.g. daily 02:30)"
-  echo "  12h             (every 12 hours from midnight)"
-  echo "  6h              (every 6 hours from midnight)"
-  echo "  weekly <DAY HH:MM> (e.g. weekly Sun 04:00)"
+  echo "  daily <HH:MM>       (e.g. daily 02:30)"
+  echo "  12h                 (every 12 hours from midnight)"
+  echo "  6h                  (every 6 hours from midnight)"
+  echo "  weekly <DAY HH:MM>  (e.g. weekly Sun 04:00)"
   exit 1
 }
 
@@ -69,117 +82,111 @@ function usage() {
 # HELPER: Derive systemd OnCalendar= expression
 ###############################################################################
 function derive_oncalendar_expression() {
-  local schedule_type="$1"
-  local schedule_time="$2"
+  local scheduleType="$1"
+  local scheduleTime="$2"
 
-  case "$schedule_type" in
+  case "$scheduleType" in
     daily)
-      if [[ -z "$schedule_time" ]]; then
+      if [[ -z "$scheduleTime" ]]; then
         echo "Error: 'daily' schedule requires a time in HH:MM format." >&2
         exit 2
       fi
-      echo "*-*-* $schedule_time:00"  # e.g. "*-*-* 02:30:00"
+      echo "*-*-* $scheduleTime:00"
       ;;
     12h)
-      echo "0/12:00:00"  # every 12 hours from midnight
+      echo "0/12:00:00"
       ;;
     6h)
-      echo "0/6:00:00"   # every 6 hours from midnight
+      echo "0/6:00:00"
       ;;
     weekly)
-      if [[ -z "$schedule_time" ]]; then
+      if [[ -z "$scheduleTime" ]]; then
         echo "Error: 'weekly' schedule requires day/time like 'Sun 04:00'." >&2
         exit 2
       fi
-      echo "$schedule_time:00"  # e.g. "Sun 04:00:00"
+      echo "$scheduleTime:00"
       ;;
     *)
-      echo "Error: Unsupported schedule_type '$schedule_type'." >&2
+      echo "Error: Unsupported schedule_type '$scheduleType'." >&2
       exit 2
       ;;
   esac
 }
 
 ###############################################################################
-# LOCAL FUNCTIONS (install/uninstall on the same node)
+# LOCAL FUNCTIONS
 ###############################################################################
 function local_disable_scrubbing() {
-  local pool_name="$1"
-  echo "Disabling automatic scrubbing on pool '$pool_name' to $DISABLE_SCRUB_SECONDS seconds..."
-  ceph osd pool set "$pool_name" scrub_min_interval $DISABLE_SCRUB_SECONDS
-  ceph osd pool set "$pool_name" scrub_max_interval $DISABLE_SCRUB_SECONDS
-  ceph osd pool set "$pool_name" deep_scrub_interval $DISABLE_SCRUB_SECONDS
+  local poolName="$1"
+  echo "Disabling automatic scrubbing on pool '${poolName}' to '${DISABLE_SCRUB_SECONDS}' seconds..."
+  ceph osd pool set "${poolName}" scrub_min_interval "${DISABLE_SCRUB_SECONDS}"
+  ceph osd pool set "${poolName}" scrub_max_interval "${DISABLE_SCRUB_SECONDS}"
+  ceph osd pool set "${poolName}" deep_scrub_interval "${DISABLE_SCRUB_SECONDS}"
 }
 
 function local_revert_scrubbing() {
-  local pool_name="$1"
-  echo "Reverting scrubbing intervals on pool '$pool_name' to defaults..."
-  ceph osd pool set "$pool_name" scrub_min_interval $DEFAULT_SCRUB_MIN
-  ceph osd pool set "$pool_name" scrub_max_interval $DEFAULT_SCRUB_MAX
-  ceph osd pool set "$pool_name" deep_scrub_interval $DEFAULT_DEEP_SCRUB
+  local poolName="$1"
+  echo "Reverting scrubbing intervals on pool '${poolName}' to defaults..."
+  ceph osd pool set "${poolName}" scrub_min_interval "${DEFAULT_SCRUB_MIN}"
+  ceph osd pool set "${poolName}" scrub_max_interval "${DEFAULT_SCRUB_MAX}"
+  ceph osd pool set "${poolName}" deep_scrub_interval "${DEFAULT_DEEP_SCRUB}"
 }
 
 function local_create_scrub_script() {
-  local pool_name="$1"
-  local script_path="$SCRUB_SCRIPT_DIR/scrub-${pool_name}.sh"
+  local poolName="$1"
+  local scriptPath="${SCRUB_SCRIPT_DIR}/scrub-${poolName}.sh"
 
-  echo "Creating scrub script at $script_path ..."
-  cat <<EOF > "$script_path"
+  echo "Creating scrub script at '${scriptPath}' ..."
+  cat <<EOF > "${scriptPath}"
 #!/bin/bash
-#
-# Auto-generated deep-scrub script for pool '$pool_name'
-# by CephScrubScheduler.sh
 
-POOL="$pool_name"
-PGS=\$(ceph pg ls-by-pool "\$POOL" -f json | jq -r '.[].pgid')
+POOL="${poolName}"
+pgs=\$(ceph pg ls-by-pool "\$POOL" -f json | jq -r '.[].pgid')
 
-if [ -z "\$PGS" ]; then
-  echo "No PGs found for pool \$POOL, or 'ceph pg ls-by-pool' returned empty."
+if [ -z "\$pgs" ]; then
+  echo "No PGs found for pool \$POOL."
   exit 0
 fi
 
 echo "Starting deep-scrub on pool \$POOL ..."
-for PG in \$PGS; do
-  echo "  -> Deep-scrubbing PG \$PG"
-  ceph pg deep-scrub "\$PG"
+for pg in \$pgs; do
+  echo "  -> Deep-scrubbing PG \$pg"
+  ceph pg deep-scrub "\$pg"
 done
 
 echo "All deep-scrub commands issued for pool \$POOL."
 EOF
 
-  chmod +x "$script_path"
+  chmod +x "${scriptPath}"
 }
 
 function local_create_systemd_units() {
-  local pool_name="$1"
-  local schedule_type="$2"
-  local schedule_time="$3"
+  local poolName="$1"
+  local scheduleType="$2"
+  local scheduleTime="$3"
 
-  local service_file="$SYSTEMD_DIR/ceph-scrub-${pool_name}.service"
-  local timer_file="$SYSTEMD_DIR/ceph-scrub-${pool_name}.timer"
+  local serviceFile="${SYSTEMD_DIR}/ceph-scrub-${poolName}.service"
+  local timerFile="${SYSTEMD_DIR}/ceph-scrub-${poolName}.timer"
+  local onCalendar
+  onCalendar="$(derive_oncalendar_expression "${scheduleType}" "${scheduleTime}")"
 
-  # Service unit
-  echo "Creating systemd service unit at $service_file ..."
-  cat <<EOF > "$service_file"
+  echo "Creating systemd service unit at '${serviceFile}' ..."
+  cat <<EOF > "${serviceFile}"
 [Unit]
-Description=Ceph manual scrub for pool '$pool_name'
+Description=Manual Ceph deep-scrub for pool '${poolName}'
 
 [Service]
 Type=oneshot
-ExecStart=$SCRUB_SCRIPT_DIR/scrub-${pool_name}.sh
+ExecStart=${SCRUB_SCRIPT_DIR}/scrub-${poolName}.sh
 EOF
 
-  # Timer unit
-  local on_calendar
-  on_calendar="$(derive_oncalendar_expression "$schedule_type" "$schedule_time")"
-
-  echo "Creating systemd timer unit at $timer_file ..."
-  cat <<EOF > "$timer_file"
+  echo "Creating systemd timer unit at '${timerFile}' ..."
+  cat <<EOF > "${timerFile}"
 [Unit]
-Description=Timer for Ceph scrub on pool '$pool_name'
+Description=Timer for Ceph scrub on pool '${poolName}'
 
 [Timer]
-OnCalendar=$on_calendar
+OnCalendar=${onCalendar}
 Persistent=true
 
 [Install]
@@ -188,118 +195,95 @@ EOF
 }
 
 function local_enable_and_start_timer() {
-  local pool_name="$1"
-  local timer_name="ceph-scrub-${pool_name}.timer"
+  local poolName="$1"
+  local timerName="ceph-scrub-${poolName}.timer"
 
   echo "Reloading systemd..."
   systemctl daemon-reload
 
-  echo "Enabling and starting the timer '$timer_name'..."
-  systemctl enable "$timer_name"
-  systemctl start "$timer_name"
+  echo "Enabling and starting the timer '${timerName}'..."
+  systemctl enable "${timerName}"
+  systemctl start "${timerName}"
 
   echo "Done. Timer status:"
-  systemctl list-timers --all | grep "$timer_name" || true
+  systemctl list-timers --all | grep "${timerName}" || true
 }
 
 function local_remove_systemd_units() {
-  local pool_name="$1"
-  local service_file="$SYSTEMD_DIR/ceph-scrub-${pool_name}.service"
-  local timer_file="$SYSTEMD_DIR/ceph-scrub-${pool_name}.timer"
-  local script_path="$SCRUB_SCRIPT_DIR/scrub-${pool_name}.sh"
+  local poolName="$1"
+  local serviceFile="${SYSTEMD_DIR}/ceph-scrub-${poolName}.service"
+  local timerFile="${SYSTEMD_DIR}/ceph-scrub-${poolName}.timer"
+  local scriptPath="${SCRUB_SCRIPT_DIR}/scrub-${poolName}.sh"
 
-  echo "Stopping and disabling systemd timer for pool '$pool_name'..."
-  systemctl stop "ceph-scrub-${pool_name}.timer" 2>/dev/null || true
-  systemctl disable "ceph-scrub-${pool_name}.timer" 2>/dev/null || true
+  echo "Stopping and disabling systemd timer for pool '${poolName}'..."
+  systemctl stop "ceph-scrub-${poolName}.timer" 2>/dev/null || true
+  systemctl disable "ceph-scrub-${poolName}.timer" 2>/dev/null || true
 
-  echo "Removing service file: $service_file"
-  rm -f "$service_file"
+  echo "Removing service file: '${serviceFile}'"
+  rm -f "${serviceFile}"
 
-  echo "Removing timer file: $timer_file"
-  rm -f "$timer_file"
+  echo "Removing timer file: '${timerFile}'"
+  rm -f "${timerFile}"
 
-  echo "Removing scrub script: $script_path"
-  rm -f "$script_path"
+  echo "Removing scrub script: '${scriptPath}'"
+  rm -f "${scriptPath}"
 
   systemctl daemon-reload
 }
 
 ###############################################################################
 # REMOTE FUNCTIONS
-#
-# We use sshpass (password-based SSH) to do:
-#   1) Install ceph-common on the remote
-#   2) Copy ceph.conf and ceph.client.admin.keyring to /etc/ceph/ on remote
-#   3) Copy *this* script to the remote
-#   4) Execute "local install" or "local uninstall" on the remote
 ###############################################################################
 function remote_install() {
-  local vm_host="$1"
-  local vm_user="$2"
-  local vm_pass="$3"
-  local pool_name="$4"
-  local schedule_type="$5"
-  local schedule_time="$6"   # might be empty for e.g. 12h or 6h
+  local vmHost="$1"
+  local vmUser="$2"
+  local vmPass="$3"
+  local poolName="$4"
+  local scheduleType="$5"
+  local scheduleTime="$6"
 
-  if ! command -v sshpass &>/dev/null; then
-    echo "Error: sshpass not installed on the local system. Please install it."
-    exit 1
-  fi
-
-  # 1) Install ceph-common on remote
-  echo "Installing ceph-common on remote host '$vm_host'..."
-  sshpass -p "$vm_pass" ssh -o StrictHostKeyChecking=no "$vm_user@$vm_host" \
+  echo "Installing ceph-common on remote node '${vmHost}'..."
+  sshpass -p "${vmPass}" ssh -o StrictHostKeyChecking=no "${vmUser}@${vmHost}" \
     "sudo apt-get update -y && sudo apt-get install -y ceph-common"
 
-  # 2) Ensure /etc/ceph exists
-  sshpass -p "$vm_pass" ssh -o StrictHostKeyChecking=no "$vm_user@$vm_host" \
+  echo "Ensuring /etc/ceph on remote..."
+  sshpass -p "${vmPass}" ssh -o StrictHostKeyChecking=no "${vmUser}@${vmHost}" \
     "sudo mkdir -p /etc/ceph && sudo chmod 755 /etc/ceph"
 
-  # 3) Copy ceph.conf and ceph.client.admin.keyring
-  #    Adjust the paths if your Ceph config files differ
   echo "Copying ceph.conf and ceph.client.admin.keyring to remote..."
-  sshpass -p "$vm_pass" scp -o StrictHostKeyChecking=no /etc/ceph/ceph.conf \
-    "$vm_user@$vm_host:/tmp/ceph.conf"
-  sshpass -p "$vm_pass" scp -o StrictHostKeyChecking=no /etc/ceph/ceph.client.admin.keyring \
-    "$vm_user@$vm_host:/tmp/ceph.client.admin.keyring"
+  sshpass -p "${vmPass}" scp -o StrictHostKeyChecking=no /etc/ceph/ceph.conf \
+    "${vmUser}@${vmHost}:/tmp/ceph.conf"
+  sshpass -p "${vmPass}" scp -o StrictHostKeyChecking=no /etc/ceph/ceph.client.admin.keyring \
+    "${vmUser}@${vmHost}:/tmp/ceph.client.admin.keyring"
 
-  # Move them to /etc/ceph/ with proper perms
-  sshpass -p "$vm_pass" ssh -o StrictHostKeyChecking=no "$vm_user@$vm_host" \
+  sshpass -p "${vmPass}" ssh -o StrictHostKeyChecking=no "${vmUser}@${vmHost}" \
     "sudo mv /tmp/ceph.conf /etc/ceph/ && sudo chown root:root /etc/ceph/ceph.conf && sudo chmod 644 /etc/ceph/ceph.conf"
-  sshpass -p "$vm_pass" ssh -o StrictHostKeyChecking=no "$vm_user@$vm_host" \
+  sshpass -p "${vmPass}" ssh -o StrictHostKeyChecking=no "${vmUser}@${vmHost}" \
     "sudo mv /tmp/ceph.client.admin.keyring /etc/ceph/ && sudo chown root:root /etc/ceph/ceph.client.admin.keyring && sudo chmod 600 /etc/ceph/ceph.client.admin.keyring"
 
-  # 4) Copy *this* script to remote (in case we want to reuse the same logic)
-  local local_script_path="$(realpath "$0")"
-  local remote_script_name="CephScrubScheduler-remote.sh" # any temp name
-  echo "Copying this script to remote as /tmp/$remote_script_name ..."
-  sshpass -p "$vm_pass" scp -o StrictHostKeyChecking=no "$local_script_path" \
-    "$vm_user@$vm_host:/tmp/$remote_script_name"
+  local localScriptPath
+  localScriptPath="$(realpath "$0")"
+  local remoteScriptName="CephScrubScheduler-remote.sh"
+  echo "Copying this script to remote as /tmp/${remoteScriptName} ..."
+  sshpass -p "${vmPass}" scp -o StrictHostKeyChecking=no "${localScriptPath}" \
+    "${vmUser}@${vmHost}:/tmp/${remoteScriptName}"
 
-  # 5) Execute "local install" on remote
   echo "Running 'local install' on remote..."
-  sshpass -p "$vm_pass" ssh -o StrictHostKeyChecking=no "$vm_user@$vm_host" \
-    "sudo bash /tmp/$remote_script_name local install $pool_name $schedule_type '$schedule_time'"
+  sshpass -p "${vmPass}" ssh -o StrictHostKeyChecking=no "${vmUser}@${vmHost}" \
+    "sudo bash /tmp/${remoteScriptName} local install \"${poolName}\" \"${scheduleType}\" \"${scheduleTime}\""
 }
 
 function remote_uninstall() {
-  local vm_host="$1"
-  local vm_user="$2"
-  local vm_pass="$3"
-  local pool_name="$4"
+  local vmHost="$1"
+  local vmUser="$2"
+  local vmPass="$3"
+  local poolName="$4"
 
-  if ! command -v sshpass &>/dev/null; then
-    echo "Error: sshpass not installed on the local system. Please install it."
-    exit 1
-  fi
+  echo "Uninstalling on remote node '${vmHost}'..."
+  sshpass -p "${vmPass}" ssh -o StrictHostKeyChecking=no "${vmUser}@${vmHost}" \
+    "sudo bash /tmp/CephScrubScheduler-remote.sh local uninstall \"${poolName}\""
 
-  # We'll assume the script is still there from prior step. If not, we can scp again.
-  echo "Uninstalling on remote host '$vm_host'..."
-  sshpass -p "$vm_pass" ssh -o StrictHostKeyChecking=no "$vm_user@$vm_host" \
-    "sudo bash /tmp/CephScrubScheduler-remote.sh local uninstall $pool_name"
-
-  # Optionally remove the script from remote if you want:
-  sshpass -p "$vm_pass" ssh -o StrictHostKeyChecking=no "$vm_user@$vm_host" \
+  sshpass -p "${vmPass}" ssh -o StrictHostKeyChecking=no "${vmUser}@${vmHost}" \
     "sudo rm -f /tmp/CephScrubScheduler-remote.sh"
 }
 
@@ -310,13 +294,8 @@ if [[ $# -lt 2 ]]; then
   usage
 fi
 
-MODE="$1"        # "local" or "remote"
-ACTION="$2"      # "install" or "uninstall"
-
-case "$MODE" in
+case "$SCRIPT_MODE" in
   local)
-    # local install <pool_name> <schedule_type> [schedule_time]
-    # local uninstall <pool_name>
     case "$ACTION" in
       install)
         if [[ $# -lt 4 ]]; then
@@ -324,20 +303,16 @@ case "$MODE" in
         fi
         POOL_NAME="$3"
         SCHEDULE_TYPE="$4"
-        SCHEDULE_TIME="$5"  # optional
+        SCHEDULE_TIME="$5"
 
-        # 1) Disable scrubbing
-        local_disable_scrubbing "$POOL_NAME"
-        # 2) Create scrub script
-        local_create_scrub_script "$POOL_NAME"
-        # 3) Create systemd units
-        local_create_systemd_units "$POOL_NAME" "$SCHEDULE_TYPE" "$SCHEDULE_TIME"
-        # 4) Enable and start
-        local_enable_and_start_timer "$POOL_NAME"
+        local_disable_scrubbing "${POOL_NAME}"
+        local_create_scrub_script "${POOL_NAME}"
+        local_create_systemd_units "${POOL_NAME}" "${SCHEDULE_TYPE}" "${SCHEDULE_TIME}"
+        local_enable_and_start_timer "${POOL_NAME}"
 
         echo
-        echo "Scrubbing for pool '$POOL_NAME' is disabled (large intervals)."
-        echo "A systemd timer is now configured for manual deep-scrub at schedule [$SCHEDULE_TYPE $SCHEDULE_TIME]."
+        echo "Scrubbing for pool '${POOL_NAME}' is disabled (intervals set to '${DISABLE_SCRUB_SECONDS}')."
+        echo "A systemd timer is configured for manual deep-scrub on schedule [${SCHEDULE_TYPE} ${SCHEDULE_TIME}]."
         ;;
       uninstall)
         if [[ $# -lt 3 ]]; then
@@ -345,13 +320,11 @@ case "$MODE" in
         fi
         POOL_NAME="$3"
 
-        # 1) Remove systemd units
-        local_remove_systemd_units "$POOL_NAME"
-        # 2) Revert scrubbing
-        local_revert_scrubbing "$POOL_NAME"
+        local_remove_systemd_units "${POOL_NAME}"
+        local_revert_scrubbing "${POOL_NAME}"
 
         echo
-        echo "Pool '$POOL_NAME' scrubbing intervals reverted to defaults."
+        echo "Pool '${POOL_NAME}' scrubbing intervals reverted to defaults."
         echo "Systemd service/timer removed."
         ;;
       *)
@@ -360,32 +333,50 @@ case "$MODE" in
     esac
     ;;
   remote)
-    # remote install <host> <user> <pass> <pool_name> <schedule_type> [time]
-    # remote uninstall <host> <user> <pass> <pool_name>
     case "$ACTION" in
       install)
         if [[ $# -lt 6 ]]; then
           usage
         fi
-        VM_HOST="$3"
+
+        REMOTE_NODE_NAME="$3"
         VM_USER="$4"
         VM_PASS="$5"
         POOL_NAME="$6"
         SCHEDULE_TYPE="$7"
-        SCHEDULE_TIME="$8"  # might be empty
+        SCHEDULE_TIME="$8"
 
-        remote_install "$VM_HOST" "$VM_USER" "$VM_PASS" "$POOL_NAME" "$SCHEDULE_TYPE" "$SCHEDULE_TIME"
+        # Convert node name to IP using Proxmox cluster info
+        readarray -t REMOTE_NODE_IPS < <( get_remote_node_ips )
+        VM_HOST="$(get_ip_from_name "${REMOTE_NODE_NAME}")"
+
+        # Verify that the IP is recognized in the cluster
+        if [[ ! " ${REMOTE_NODE_IPS[@]} " =~ " ${VM_HOST} " ]]; then
+          echo "Error: Node '${REMOTE_NODE_NAME}' does not correspond to a valid IP in this cluster."
+          exit 1
+        fi
+
+        remote_install "${VM_HOST}" "${VM_USER}" "${VM_PASS}" "${POOL_NAME}" "${SCHEDULE_TYPE}" "${SCHEDULE_TIME}"
         ;;
       uninstall)
         if [[ $# -lt 6 ]]; then
           usage
         fi
-        VM_HOST="$3"
+
+        REMOTE_NODE_NAME="$3"
         VM_USER="$4"
         VM_PASS="$5"
         POOL_NAME="$6"
 
-        remote_uninstall "$VM_HOST" "$VM_USER" "$VM_PASS" "$POOL_NAME"
+        readarray -t REMOTE_NODE_IPS < <( get_remote_node_ips )
+        VM_HOST="$(get_ip_from_name "${REMOTE_NODE_NAME}")"
+
+        if [[ ! " ${REMOTE_NODE_IPS[@]} " =~ " ${VM_HOST} " ]]; then
+          echo "Error: Node '${REMOTE_NODE_NAME}' does not correspond to a valid IP in this cluster."
+          exit 1
+        fi
+
+        remote_uninstall "${VM_HOST}" "${VM_USER}" "${VM_PASS}" "${POOL_NAME}"
         ;;
       *)
         usage
@@ -396,3 +387,5 @@ case "$MODE" in
     usage
     ;;
 esac
+
+prompt_keep_installed_packages

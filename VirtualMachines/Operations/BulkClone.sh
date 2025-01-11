@@ -5,7 +5,7 @@
 # designated pool is optional. This script is particularly useful for quickly deploying multiple VMs based on a standardized configuration.
 #
 # Usage:
-# ./CloneVMs.sh <source_vm_id> <base_vm_name> <start_vm_id> <num_vms> [pool_name]
+# ./BulkClone.sh <source_vm_id> <base_vm_name> <start_vm_id> <num_vms> [pool_name]
 #
 # Arguments:
 #   source_vm_id - The ID of the VM that will be cloned.
@@ -15,8 +15,8 @@
 #   pool_name - Optional. The name of the pool to which the new VMs will be added. If not provided, VMs are not added to any pool.
 #
 # Example:
-#   ./CloneVMs.sh 110 Ubuntu-2C-20GB 400 30 PoolName
-#   ./CloneVMs.sh 110 Ubuntu-2C-20GB 400 30  # Without specifying a pool
+#   ./BulkClone.sh 110 Ubuntu-2C-20GB 400 30 PoolName
+#   ./BulkClone.sh 110 Ubuntu-2C-20GB 400 30  # Without specifying a pool
 
 # Check if the minimum required parameters are provided
 if [ "$#" -lt 4 ]; then

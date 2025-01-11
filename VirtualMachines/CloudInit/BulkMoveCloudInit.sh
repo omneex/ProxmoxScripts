@@ -6,7 +6,7 @@
 # This is particularly useful for reorganizing storage resources or moving Cloud-Init configurations to a different storage backend.
 #
 # Usage:
-# ./MigrateCloudInitDisk.sh <start_vmid|ALL> <end_vmid|target_storage> [target_storage]
+# ./BulkMoveCloudInit.sh <start_vmid|ALL> <end_vmid|target_storage> [target_storage]
 #
 # Arguments:
 #   start_vmid      - The starting VM ID for migration. Use "ALL" to target all VMs.
@@ -15,10 +15,10 @@
 #   target_storage  - (Optional) The target storage for the Cloud-Init disk. Required if start_vmid is not "ALL".
 #
 # Examples:
-#   ./MigrateCloudInitDisk.sh 100 200 local-lvm
+#   ./BulkMoveCloudInit.sh 100 200 local-lvm
 #   This command will migrate Cloud-Init disks for VMs with IDs from 100 to 200 to the "local-lvm" storage.
 #
-#   ./MigrateCloudInitDisk.sh ALL ceph-storage
+#   ./BulkMoveCloudInit.sh ALL ceph-storage
 #   This command will migrate Cloud-Init disks for all VMs to the "ceph-storage" storage.
 #
 # Important Notes:
@@ -29,7 +29,7 @@
 #
 # Permissions and Execution:
 #   Ensure the script has execute permissions:
-#     chmod +x MigrateCloudInitDisk.sh
+#     chmod +x BulkMoveCloudInit.sh
 #   Execute the script as shown in the usage examples.
 
 # Exit immediately if a command exits with a non-zero status

@@ -3,14 +3,14 @@
 # This script stops a range of virtual machines (VMs) within a Proxmox VE environment.
 #
 # Usage:
-# ./StopVMs.sh <first_vm_id> <last_vm_id>
+# ./BulkStop.sh <first_vm_id> <last_vm_id>
 #
 # Arguments:
 #   first_vm_id - The ID of the first VM to stop.
 #   last_vm_id - The ID of the last VM to stop.
 #
 # Example:
-#   ./StopVMs.sh 400 430
+#   ./BulkStop.sh 400 430
 
 # Check if the required parameters are provided
 if [ "$#" -ne 2 ]; then

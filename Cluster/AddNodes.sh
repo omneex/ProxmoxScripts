@@ -31,7 +31,7 @@
 
 set +e
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Preliminary Checks

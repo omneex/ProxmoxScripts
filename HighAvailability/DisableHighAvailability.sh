@@ -19,7 +19,7 @@
 #   - You must run this script as root on a Proxmox node that is part of the same cluster as <node_name>.
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # MAIN

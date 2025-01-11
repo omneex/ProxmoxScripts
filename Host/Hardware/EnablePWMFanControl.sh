@@ -26,7 +26,7 @@
 # fan control (e.g., /sys/class/hwmon/).
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Preliminary Checks

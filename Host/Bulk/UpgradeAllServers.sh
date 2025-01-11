@@ -21,7 +21,7 @@
 #   ./UpgradeAllServers.sh
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Preliminary Checks

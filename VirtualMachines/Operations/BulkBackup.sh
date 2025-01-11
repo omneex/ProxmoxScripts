@@ -3,7 +3,7 @@
 # This script backs up a range of VMs within a Proxmox environment to a specified storage.
 #
 # Usage:
-# ./BackupVMs.sh <start_vm_id> <end_vm_id> <storage>
+# ./BulkBackup.sh <start_vm_id> <end_vm_id> <storage>
 #
 # Arguments:
 #   start_vm_id - The ID of the first VM to back up.
@@ -11,7 +11,7 @@
 #   storage - The target storage location for the backup.
 #
 # Example:
-#   ./BackupVMs.sh 500 525 local
+#   ./BulkBackup.sh 500 525 local
 
 # Check if the required parameters are provided
 if [ "$#" -ne 3 ]; then

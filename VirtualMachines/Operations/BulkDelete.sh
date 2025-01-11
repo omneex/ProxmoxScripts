@@ -6,11 +6,11 @@
 # range are properly shut down and removed from the system. Caution is advised, as this will permanently delete VMs.
 
 # Usage:
-# ./DeleteBulkVMs.sh start_vmid stop_vmid
+# ./BulkDelete.sh start_vmid stop_vmid
 #   start_vmid - The starting VM ID from which the batch operation begins.
 #   stop_vmid - The ending VM ID up to which the batch operation is performed.
 # Example:
-#   ./DeleteBulkVMs.sh 600 650
+#   ./BulkDelete.sh 600 650
 
 # Check if input arguments are provided
 if [ "$#" -lt 2 ]; then

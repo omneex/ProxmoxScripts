@@ -1,22 +1,45 @@
 #!/bin/bash
 #
-# This script starts all stopped Ceph OSDs within a Proxmox VE environment.
+# StartStoppedOSDs.sh
+#
+# This script starts all stopped Ceph OSDs in a Proxmox VE environment.
 #
 # Usage:
-# ./StartStoppedOSDs.sh
+#   ./StartStoppedOSDs.sh
+#
+# This script:
+#  - Checks for root privileges.
+#  - Verifies it is running in a Proxmox environment.
+#  - Checks or installs the 'ceph' package if needed.
+#  - Lists all OSDs that are down and attempts to start them.
+#
 
-# Get the list of all stopped OSDs
-STOPPED_OSDS=$(ceph osd tree | awk '/down/ {print $4}')
+source "$UTILITIES"
 
-# Loop through each stopped OSD and start it
-for OSD_ID in $STOPPED_OSDS; do
-    echo "Starting OSD ID: $OSD_ID"
-    ceph osd start osd.$OSD_ID
-    if [ $? -eq 0 ]; then
-        echo " - OSD ID: $OSD_ID started successfully."
-    else
-        echo " - Failed to start OSD ID: $OSD_ID."
-    fi
+###############################################################################
+# Preliminary Checks
+###############################################################################
+check_root
+check_proxmox
+
+###############################################################################
+# Main Logic
+###############################################################################
+STOPPED_OSDS="$(ceph osd tree | awk '/down/ {print $4}')"
+
+if [ -z "$STOPPED_OSDS" ]; then
+  echo "No OSD is reported as down. Exiting."
+  exit 0
+fi
+
+for osdId in $STOPPED_OSDS; do
+  echo "Starting OSD ID: $osdId"
+  ceph osd start "osd.${osdId}"
+  if [ $? -eq 0 ]; then
+    echo " - OSD ID: $osdId started successfully."
+  else
+    echo " - Failed to start OSD ID: $osdId."
+  fi
 done
 
 echo "OSD start process completed!"

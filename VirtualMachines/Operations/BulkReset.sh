@@ -3,14 +3,14 @@
 # This script resets a range of virtual machines (VMs) within a Proxmox VE environment.
 #
 # Usage:
-# ./ResetVMs.sh <first_vm_id> <last_vm_id>
+# ./BulkReset.sh <first_vm_id> <last_vm_id>
 #
 # Arguments:
 #   first_vm_id - The ID of the first VM to reset.
 #   last_vm_id - The ID of the last VM to reset.
 #
 # Example:
-#   ./ResetVMs.sh 400 430
+#   ./BulkReset.sh 400 430
 
 # Check if the required parameters are provided
 if [ "$#" -ne 2 ]; then

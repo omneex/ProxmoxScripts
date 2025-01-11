@@ -22,7 +22,7 @@
 # to GPU hardware.
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Setup

@@ -1,15 +1,15 @@
 #!/bin/bash
 #
-# UpdateAllLXC.sh
+# UpdateAll.sh
 #
 # A script to apply package updates to all Linux containers (LXC) on every host
 # in a Proxmox cluster. Requires root privileges and passwordless SSH between nodes.
 #
 # Usage:
-#   ./UpdateAllLXC.sh
+#   ./UpdateAll.sh
 #
 # Example:
-#   ./UpdateAllLXC.sh
+#   ./UpdateAll.sh
 #
 # Description:
 #   1. Checks if this script is run as root (check_root).
@@ -19,11 +19,9 @@
 #   5. Finds the local node IP and remote node IPs.
 #   6. Iterates over all nodes (local + remote), enumerates their LXC containers,
 #      and applies package updates inside each container.
-#   7. At script exit, prompts to keep or remove newly installed packages
-#      (prompt_keep_installed_packages).
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Preliminary Checks via Utilities

@@ -5,7 +5,7 @@
 # and regenerates the Cloud-Init image to apply the changes.
 #
 # Usage:
-# ./UpdateVMIPs.sh <start_vm_id> <end_vm_id> <start_ip/cidr> <bridge> [gateway]
+# ./BulkChangeIP.sh <start_vm_id> <end_vm_id> <start_ip/cidr> <bridge> [gateway]
 #
 # Arguments:
 #   start_vm_id - The ID of the first VM to update.
@@ -15,8 +15,8 @@
 #   gateway - Optional. The gateway for the IP configuration
 #
 # Example:
-#   ./UpdateVMIPs.sh 400 430 192.168.1.50/24 vmbr0 192.168.1.1
-#   ./UpdateVMIPs.sh 400 430 192.168.1.50/24 vmbr0 # Without specifying a gateway
+#   ./BulkChangeIP.sh 400 430 192.168.1.50/24 vmbr0 192.168.1.1
+#   ./BulkChangeIP.sh 400 430 192.168.1.50/24 vmbr0 # Without specifying a gateway
 
 # Check if the minimum required parameters are provided
 if [ "$#" -lt 4 ]; then

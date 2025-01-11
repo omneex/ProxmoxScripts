@@ -1,50 +1,56 @@
 #!/bin/bash
 #
-# This script adds an SSH public key to a range of virtual machines (VMs) within a Proxmox VE environment.
-# It appends a new SSH public key for each VM and regenerates the Cloud-Init image to apply the changes.
+# BulkAddSSHKey.sh
+#
+# This script adds an SSH public key to a range of virtual machines (VMs) 
+# within a Proxmox VE environment. It appends a new SSH public key for each VM 
+# and regenerates the Cloud-Init image to apply the changes.
 #
 # Usage:
-# ./AddSSHKey.sh <start_vm_id> <end_vm_id> <ssh_public_key>
-#
-# Arguments:
-#   start_vm_id - The ID of the first VM to update.
-#   end_vm_id - The ID of the last VM to update.
-#   ssh_public_key - The SSH public key to be added to the VM.
+#   ./BulkAddSSHKey.sh <start_vm_id> <end_vm_id> <ssh_public_key>
 #
 # Example:
-#   ./AddSSHKey.sh 400 430 "ssh-rsa AAAAB3Nza... user@host"
+#   # Adds the specified SSH key to all VMs with IDs between 400 and 430
+#   ./BulkAddSSHKey.sh 400 430 "ssh-rsa AAAAB3Nza... user@host"
+#
 
-# Check if the minimum required parameters are provided
+source "$UTILITIES"
+
+###############################################################################
+# Validate environment and arguments
+###############################################################################
+check_root
+check_proxmox
+
 if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 <start_vm_id> <end_vm_id> <ssh_public_key>"
-    exit 1
+  echo "Error: Wrong number of arguments." >&2
+  echo "Usage: $0 <start_vm_id> <end_vm_id> <ssh_public_key>" >&2
+  exit 1
 fi
 
-# Assigning input arguments
-START_VM_ID=$1
-END_VM_ID=$2
-SSH_PUBLIC_KEY=$3
+START_VM_ID="$1"
+END_VM_ID="$2"
+SSH_PUBLIC_KEY="$3"
 
-# Loop to add SSH public key for VMs in the specified range
-for (( VMID=START_VM_ID; VMID<=END_VM_ID; VMID++ )); do
-    # Check if the VM exists
-    if qm status $VMID &>/dev/null; then
-        echo "Adding SSH public key to VM ID: $VMID"
-
-        # Append the SSH public key to the existing keys using Cloud-Init
-        TEMP_FILE=$(mktemp)
-        qm cloudinit get $VMID ssh-authorized-keys > "$TEMP_FILE"
-        echo "$SSH_PUBLIC_KEY" >> "$TEMP_FILE"
-        qm set $VMID --sshkeys "$TEMP_FILE"
-        rm "$TEMP_FILE"
-
-        # Regenerate the Cloud-Init image
-        qm cloudinit dump $VMID
-        echo " - SSH public key appended for VM ID: $VMID."
-    else
-        echo "VM ID: $VMID does not exist. Skipping..."
-    fi
-
+###############################################################################
+# Main logic
+###############################################################################
+for (( vmId=START_VM_ID; vmId<=END_VM_ID; vmId++ )); do
+  if qm status "$vmId" &>/dev/null; then
+    echo "Adding SSH public key to VM ID: $vmId"
+    tempFile="$(mktemp)"
+    qm cloudinit get "$vmId" ssh-authorized-keys > "$tempFile"
+    echo "$SSH_PUBLIC_KEY" >> "$tempFile"
+    qm set "$vmId" --sshkeys "$tempFile"
+    rm "$tempFile"
+    qm cloudinit dump "$vmId"
+    echo " - SSH public key appended for VM ID: $vmId."
+  else
+    echo "VM ID: $vmId does not exist. Skipping..."
+  fi
 done
 
+###############################################################################
+# Wrap-up
+###############################################################################
 echo "SSH public key addition process completed!"

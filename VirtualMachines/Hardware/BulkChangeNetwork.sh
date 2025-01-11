@@ -5,7 +5,7 @@
 # The script checks for the existence of each VM's configuration file and ensures that changes are only made where applicable.
 #
 # Usage:
-# ./VMConfigChangeNetwork.sh <start_id> <end_id> <hostname> <current_network> <new_network>
+# ./BulkChangeNetwork.sh <start_id> <end_id> <hostname> <current_network> <new_network>
 # Where:
 #   start_id - The starting VM ID in the range to be processed.
 #   end_id - The ending VM ID in the range to be processed.

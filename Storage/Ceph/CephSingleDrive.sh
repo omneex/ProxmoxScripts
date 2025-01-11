@@ -1,39 +1,37 @@
 #!/bin/bash
 #
-# This script guides through the installation and setup of Proxmox with Ceph,
-# ensuring efficient usage of local storage and proper configuration of OSDs.
+# CephSingleDrive.sh
+#
+# This script helps set up Ceph on a single-drive system, such as a home lab
+# server, by removing the local-lvm partition and creating a Ceph OSD in the
+# freed space.
 #
 # Usage:
-#   ./ProxmoxCephSetup.sh <create_osd/clear_local_lvm>
+#   ./CephSingleDrive.sh <create_osd|clear_local_lvm>
 #
 # Steps:
-#   create_osd    - Bootstrap auth, create LVs, prepare OSDs
+#   create_osd      - Bootstrap Ceph auth, create LVs, and prepare an OSD
 #   clear_local_lvm - Delete the local-lvm (pve/data) volume (Destructive!)
 #
 # Examples:
-#   ./ProxmoxCephSetup.sh create_osd
-#   ./ProxmoxCephSetup.sh clear_local_lvm
+#   ./CephSingleDrive.sh create_osd
+#   ./CephSingleDrive.sh clear_local_lvm
 #
 
-# Check if the step is provided
-if [ -z "$1" ]; then
-    echo "Usage: $0 <step>"
-    echo "Steps: 'create_osd', 'clear_local_lvm'"
-    exit 1
-fi
+source "$UTILITIES"
 
-STEP="$1"
+check_root
+check_proxmox
 
-#######################################
-# Function to remove local-lvm (pve/data)
-# This is a destructive operation.
-#######################################
+###############################################################################
+# Functions
+###############################################################################
 function clear_local_lvm() {
     echo "WARNING: This will remove the local-lvm 'pve/data' and all data within it!"
     read -p "Are you sure you want to proceed? [yes/NO]: " confirmation
     case "$confirmation" in
         yes|YES)
-            echo "Removing LVM volume pve/data..."
+            echo "Removing LVM volume 'pve/data'..."
             lvremove -y pve/data
             echo "Local-lvm 'pve/data' removed successfully."
             ;;
@@ -43,35 +41,31 @@ function clear_local_lvm() {
     esac
 }
 
-#######################################
-# Function to create OSDs
-# 1. Bootstrap auth
-# 2. Create new logical volume with free space
-# 3. Prepare and activate the LV for OSD
-#######################################
 function create_osd() {
-    echo "Creating OSD on node..."
-
-    # Step 1: Bootstrap auth
-    echo "Bootstrapping auth..."
+    echo "Creating OSD on this node..."
+    echo "Bootstrapping Ceph auth..."
     ceph auth get client.bootstrap-osd > /var/lib/ceph/bootstrap-osd/ceph.keyring
     echo "Bootstrap auth completed."
 
-    # Step 2: Create new logical volume with remaining free space
-    echo "Creating new logical volume..."
-    # Adjust the volume group and name (pve/vz) as needed for your environment
+    echo "Creating new logical volume with all remaining free space..."
     lvcreate -l 100%FREE -n vz pve
     echo "Logical volume 'pve/vz' created."
 
-    # Step 3: Prepare and activate the logical volume for OSD
     echo "Preparing and activating the logical volume for OSD..."
     ceph-volume lvm create --data pve/vz
     echo "OSD prepared and activated."
 }
 
-#######################################
-# Main logic based on input step
-#######################################
+###############################################################################
+# Main
+###############################################################################
+STEP="$1"
+
+if [ -z "$STEP" ]; then
+    echo "Usage: $0 <create_osd|clear_local_lvm>"
+    exit 1
+fi
+
 case "$STEP" in
     create_osd)
         create_osd
@@ -80,7 +74,7 @@ case "$STEP" in
         clear_local_lvm
         ;;
     *)
-        echo "Invalid step. Use 'create_osd' or 'clear_local_lvm'"
+        echo "Invalid step. Use 'create_osd' or 'clear_local_lvm'."
         exit 2
         ;;
 esac

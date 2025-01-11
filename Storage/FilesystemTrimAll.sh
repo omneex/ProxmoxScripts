@@ -2,9 +2,9 @@
 #
 # FilesystemTrimAll.sh
 #
-# A script to run TRIM on all relevant filesystems for LXC containers and VMs (via qm)
-# that have the guest agent enabled. This can be done for the current host or all hosts
-# in the Proxmox cluster.
+# A script to run TRIM on all relevant filesystems for LXC containers and QEMU VMs 
+# (via qm) that have the guest agent enabled. This can be done for the current host 
+# or all hosts in the Proxmox cluster.
 #
 # Usage:
 #   ./FilesystemTrimAll.sh [all|host]
@@ -19,153 +19,137 @@
 #     they will be trimmed.
 #
 # Examples:
-#   1) ./FilesystemTrimAll.sh
-#      Runs fstrim on the current host only (default behavior).
+#   # Runs fstrim on the current host only (default behavior).
+#   ./FilesystemTrimAll.sh
 #
-#   2) ./FilesystemTrimAll.sh host
-#      Same as above, explicitly specifying "host".
+#   # Same as above, explicitly specifying "host".
+#   ./FilesystemTrimAll.sh host
 #
-#   3) ./FilesystemTrimAll.sh all
-#      Attempts to run fstrim on every node in the cluster.
+#   # Attempts to run fstrim on every node in the cluster.
+#   ./FilesystemTrimAll.sh all
 #
 # Note:
-#   - Ensure you're running this as root or via sudo.
-#   - Check that "qm" and "pct" commands are installed and accessible.
-#   - For cluster-wide operation, SSH keys between nodes should be set up 
-#     for passwordless login (or be prepared to enter credentials).
+#   - Ensure you’re running this as root or via sudo.
+#   - This script can only run on a Proxmox node.
+#   - For cluster-wide operation, SSH keys between nodes should be set up for 
+#     passwordless login (or be prepared to enter credentials).
 #
 
-# --- Preliminary Checks -----------------------------------------------------
-set -e
+source "$UTILITIES"
 
-if [[ $EUID -ne 0 ]]; then
-  echo "Error: This script must be run as root (sudo)."
-  exit 1
-fi
+###############################################################################
+# Preliminary Checks
+###############################################################################
+check_root
+check_proxmox
 
-if ! command -v qm &>/dev/null; then
-  echo "Error: 'qm' not found. Are you sure this is a Proxmox node?"
-  exit 2
-fi
-
-if ! command -v pct &>/dev/null; then
-  echo "Error: 'pct' not found. Are you sure this is a Proxmox node?"
-  exit 3
-fi
-
-# --- Functions -------------------------------------------------------------
-
+###############################################################################
+# Function Definitions
+###############################################################################
 trim_on_node() {
-  local NODE="$1"
+  local node="$1"
 
-  echo "---- [Node: $NODE] Gathering QEMU VMs with guest agent enabled... ----"
-
-  # We retrieve a list of VMIDs that have 'agent: 1' or 'agent: enabled=1' in config
-  # The config line can differ, so we check generically for 'agent:.*enable'
-  local VM_IDS
-  VM_IDS=$(ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$NODE" \
+  echo "---- [Node: \"$node\"] Gathering QEMU VMs with guest agent enabled... ----"
+  local vmIds
+  vmIds=$(ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$node" \
     "qm list --full | awk 'NR>1 {print \$1}'" 2>/dev/null || true)
 
-  if [[ -z "$VM_IDS" ]]; then
-    echo "[Node: $NODE] No QEMU VMs found."
+  if [[ -z "$vmIds" ]]; then
+    echo "[Node: \"$node\"] No QEMU VMs found."
   else
-    for VMID in $VM_IDS; do
-      if ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$NODE" \
-        "qm config $VMID 2>/dev/null | grep -Eq '^agent:.*(enable=1|=1)'" ; then
-        echo "[Node: $NODE] Trimming QEMU VM ID: $VMID"
-        # We attempt to run fstrim -a inside the guest
-        ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$NODE" \
-          "qm guest exec $VMID -- fstrim -a || echo 'Warning: fstrim command failed on VM $VMID.'"
+    for vmId in $vmIds; do
+      if ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$node" \
+        "qm config \"$vmId\" 2>/dev/null | grep -Eq '^agent:.*(enable=1|=1)'" ; then
+        echo "[Node: \"$node\"] Trimming QEMU VM ID: \"$vmId\""
+        ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$node" \
+          "qm guest exec \"$vmId\" -- fstrim -a || echo 'Warning: fstrim command failed on VM \"$vmId\".'"
       else
-        echo "[Node: $NODE] Skipping QEMU VM ID: $VMID (guest agent not enabled)."
+        echo "[Node: \"$node\"] Skipping QEMU VM ID: \"$vmId\" (guest agent not enabled)."
       fi
     done
   fi
 
-  echo "---- [Node: $NODE] Gathering LXC containers... ----"
-  local CT_IDS
-  CT_IDS=$(ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$NODE" \
+  echo "---- [Node: \"$node\"] Gathering LXC containers... ----"
+  local ctIds
+  ctIds=$(ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$node" \
     "pct list --full | awk 'NR>1 {print \$1}'" 2>/dev/null || true)
 
-  if [[ -z "$CT_IDS" ]]; then
-    echo "[Node: $NODE] No LXC containers found."
+  if [[ -z "$ctIds" ]]; then
+    echo "[Node: \"$node\"] No LXC containers found."
   else
-    for CTID in $CT_IDS; do
-      echo "[Node: $NODE] Trimming LXC CT ID: $CTID"
-      ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$NODE" \
-        "pct exec $CTID -- fstrim -a || echo 'Warning: fstrim command failed on CT $CTID.'"
+    for ctId in $ctIds; do
+      echo "[Node: \"$node\"] Trimming LXC CT ID: \"$ctId\""
+      ssh -o BatchMode=yes -o StrictHostKeyChecking=no "$node" \
+        "pct exec \"$ctId\" -- fstrim -a || echo 'Warning: fstrim command failed on CT \"$ctId\".'"
     done
   fi
 }
 
-# --- Main Script Logic -----------------------------------------------------
-
-MODE="$1"
-if [[ -z "$MODE" ]]; then
-  MODE="host"
+###############################################################################
+# Main Script Logic
+###############################################################################
+mode="$1"
+if [[ -z "$mode" ]]; then
+  mode="host"
 fi
 
-case "$MODE" in
+case "$mode" in
   host)
     echo "Operating on current node only..."
-    CURRENT_NODE=$(hostname)
-    # No SSH needed for local node, so we slightly modify the function logic:
-    echo "---- [Node: $CURRENT_NODE] Gathering QEMU VMs with guest agent enabled... ----"
+    localNode="$(hostname)"
 
-    VM_IDS=$(qm list --full | awk 'NR>1 {print $1}')
-    if [[ -z "$VM_IDS" ]]; then
-      echo "[Node: $CURRENT_NODE] No QEMU VMs found."
+    echo "---- [Node: \"$localNode\"] Gathering QEMU VMs with guest agent enabled... ----"
+    local vmIds
+    vmIds=$(qm list --full | awk 'NR>1 {print $1}')
+    if [[ -z "$vmIds" ]]; then
+      echo "[Node: \"$localNode\"] No QEMU VMs found."
     else
-      for VMID in $VM_IDS; do
-        if qm config "$VMID" 2>/dev/null | grep -Eq '^agent:.*(enable=1|=1)'; then
-          echo "[Node: $CURRENT_NODE] Trimming QEMU VM ID: $VMID"
-          qm guest exec "$VMID" -- fstrim -a || \
-            echo "Warning: fstrim command failed on VM $VMID."
+      for vmId in $vmIds; do
+        if qm config "$vmId" 2>/dev/null | grep -Eq '^agent:.*(enable=1|=1)'; then
+          echo "[Node: \"$localNode\"] Trimming QEMU VM ID: \"$vmId\""
+          qm guest exec "$vmId" -- fstrim -a || \
+            echo "Warning: fstrim command failed on VM \"$vmId\"."
         else
-          echo "[Node: $CURRENT_NODE] Skipping QEMU VM ID: $VMID (guest agent not enabled)."
+          echo "[Node: \"$localNode\"] Skipping QEMU VM ID: \"$vmId\" (guest agent not enabled)."
         fi
       done
     fi
 
-    echo "---- [Node: $CURRENT_NODE] Gathering LXC containers... ----"
-    CT_IDS=$(pct list --full | awk 'NR>1 {print $1}')
-    if [[ -z "$CT_IDS" ]]; then
-      echo "[Node: $CURRENT_NODE] No LXC containers found."
+    echo "---- [Node: \"$localNode\"] Gathering LXC containers... ----"
+    local ctIds
+    ctIds=$(pct list --full | awk 'NR>1 {print $1}')
+    if [[ -z "$ctIds" ]]; then
+      echo "[Node: \"$localNode\"] No LXC containers found."
     else
-      for CTID in $CT_IDS; do
-        echo "[Node: $CURRENT_NODE] Trimming LXC CT ID: $CTID"
-        pct exec "$CTID" -- fstrim -a || \
-          echo "Warning: fstrim command failed on CT $CTID."
+      for ctId in $ctIds; do
+        echo "[Node: \"$localNode\"] Trimming LXC CT ID: \"$ctId\""
+        pct exec "$ctId" -- fstrim -a || \
+          echo "Warning: fstrim command failed on CT \"$ctId\"."
       done
     fi
     ;;
 
   all)
     echo "Operating on all nodes in the cluster..."
-    # Retrieve cluster nodes
-    # 'pvesh get /cluster/resources --type node | jq -r .[].name' can list node names
-    if ! command -v pvesh &>/dev/null; then
-      echo "Error: 'pvesh' not found. Unable to list all nodes in the cluster."
-      exit 4
-    fi
-    
-    NODE_LIST=$(pvesh get /cluster/resources --type node 2>/dev/null | grep '"name"' | awk -F'"' '{print $4}')
-    if [[ -z "$NODE_LIST" ]]; then
+    local nodeList
+    nodeList=$(pvesh get /cluster/resources --type node 2>/dev/null | grep '"name"' | awk -F'"' '{print $4}')
+
+    if [[ -z "$nodeList" ]]; then
       echo "No cluster nodes found or failed to retrieve node list."
       exit 0
     fi
 
-    for NODE in $NODE_LIST; do
+    for node in $nodeList; do
       echo "========================================================================"
-      echo "Proceeding with Node: $NODE"
+      echo "Proceeding with Node: \"$node\""
       echo "========================================================================"
-      trim_on_node "$NODE"
+      trim_on_node "$node"
     done
     ;;
 
   *)
-    echo "Usage: $0 [all|host]"
-    echo "Error: Invalid argument '$MODE'"
+    echo "Usage: \"$0\" [all|host]"
+    echo "Error: Invalid argument \"$mode\""
     exit 1
     ;;
 esac

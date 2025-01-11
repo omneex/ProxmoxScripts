@@ -2,71 +2,63 @@
 #
 # BulkSetMemory.sh
 #
-# This script sets the memory (RAM) and optional swap allocation for a series of LXC containers.
+# This script sets the memory (RAM) and optional swap allocation for a range of LXC containers.
 #
 # Usage:
-#   ./BulkSetMemory.sh <start_ct_id> <num_cts> <memory_MB> [swap_MB]
+#   ./BulkSetMemory.sh <start_ct_id> <end_ct_id> <memory_MB> [swap_MB]
 #
-# Example:
-#   ./BulkSetMemory.sh 400 3 2048
-#   Sets containers 400..402 to 2048 MB of RAM, no swap
+# Examples:
+#   # Sets containers 400..402 to 2048 MB of RAM, no swap
+#   ./BulkSetMemory.sh 400 402 2048
 #
-#   ./BulkSetMemory.sh 400 3 2048 1024
-#   Sets containers 400..402 to 2048 MB of RAM and 1024 MB of swap
+#   # Sets containers 400..402 to 2048 MB of RAM and 1024 MB of swap
+#   ./BulkSetMemory.sh 400 402 2048 1024
 #
 # Notes:
 #   - Must be run as root on a Proxmox node.
-#   - 'pct' is required (part of the PVE/LXC utilities).
+#   - 'pct' is included by default on Proxmox 8.
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # MAIN
 ###############################################################################
-# --- Parse arguments -------------------------------------------------------
+
+# Check argument count
 if [[ $# -lt 3 ]]; then
-  echo "Usage: $0 <start_ct_id> <num_cts> <memory_MB> [swap_MB]"
-  echo "Example:"
-  echo "  $0 400 3 2048"
+  echo "Usage: $0 <start_ct_id> <end_ct_id> <memory_MB> [swap_MB]"
+  echo "Examples:"
+  echo "  $0 400 402 2048"
   echo "    (Sets containers 400..402 to 2048 MB of RAM, no swap)"
-  echo "  $0 400 3 2048 1024"
+  echo "  $0 400 402 2048 1024"
   echo "    (Sets containers 400..402 to 2048 MB of RAM and 1024 MB of swap)"
   exit 1
 fi
 
-local start_ct_id="$1"
-local num_cts="$2"
-local memory_mb="$3"
-local swap_mb="${4:-0}"  # default 0 if not provided
+START_CT_ID="$1"
+END_CT_ID="$2"
+MEMORY_MB="$3"
+SWAP_MB="${4:-0}"
 
-# --- Basic checks ----------------------------------------------------------
-check_proxmox_and_root  # Must be root and on a Proxmox node
+check_root
+check_proxmox
 
-# If a cluster check is needed, uncomment the next line:
-# check_cluster_membership
+echo "=== Starting memory config update for containers from \"$START_CT_ID\" to \"$END_CT_ID\" ==="
+echo " - Memory (MB): \"$MEMORY_MB\""
+echo " - Swap (MB): \"$SWAP_MB\""
 
-# --- Display summary -------------------------------------------------------
-echo "=== Starting memory config update for $num_cts container(s) ==="
-echo " - Starting container ID: $start_ct_id"
-echo " - Memory (MB): $memory_mb"
-echo " - Swap (MB): $swap_mb"
-
-# --- Main Loop -------------------------------------------------------------
-for (( i=0; i<num_cts; i++ )); do
-  local current_ct_id=$(( start_ct_id + i ))
-
-  # Check if container exists
-  if pct config "$current_ct_id" &>/dev/null; then
-    echo "Updating memory for container $current_ct_id..."
-    pct set "$current_ct_id" -memory "$memory_mb" -swap "$swap_mb"
+for (( currentCtId="$START_CT_ID"; currentCtId<="$END_CT_ID"; currentCtId++ )); do
+  if pct config "$currentCtId" &>/dev/null; then
+    echo "Updating memory for container \"$currentCtId\"..."
+    pct set "$currentCtId" -memory "$MEMORY_MB" -swap "$SWAP_MB"
     if [[ $? -eq 0 ]]; then
-      echo " - Successfully updated memory for CT $current_ct_id."
+      echo " - Successfully updated memory for CT \"$currentCtId\"."
     else
-      echo " - Failed to update memory for CT $current_ct_id."
+      echo " - Failed to update memory for CT \"$currentCtId\"."
     fi
   else
-    echo " - Container $current_ct_id does not exist. Skipping."
+    echo " - Container \"$currentCtId\" does not exist. Skipping."
   fi
 done
 

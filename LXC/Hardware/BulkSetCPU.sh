@@ -2,80 +2,68 @@
 #
 # BulkSetCPU.sh
 #
-# This script sets the CPU type and core count for a series of LXC containers.
+# This script sets the CPU type and core count for a range of LXC containers.
 #
 # Usage:
-#   ./BulkSetCPU.sh <start_ct_id> <num_cts> <cpu_type> <core_count> [sockets]
+#   ./BulkSetCPU.sh <start_ct_id> <end_ct_id> <cpu_type> <core_count> [sockets]
 #
 # Example:
-#   ./BulkSetCPU.sh 400 3 host 4
-#   This sets containers 400..402 to CPU type=host and 4 cores
+#   # Sets containers 400..402 to CPU type=host and 4 cores
+#   ./BulkSetCPU.sh 400 402 host 4
 #
-#   ./BulkSetCPU.sh 400 3 host 4 2
-#   Sets containers 400..402 to CPU type=host, 4 cores, 2 sockets
+#   # Sets containers 400..402 to CPU type=host, 4 cores, 2 sockets
+#   ./BulkSetCPU.sh 400 402 host 4 2
 #
 # Notes:
 #   - Must be run as root on a Proxmox node.
 #   - 'pct' is required (part of the PVE/LXC utilities).
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # MAIN
 ###############################################################################
 # --- Parse arguments -------------------------------------------------------
 if [[ $# -lt 4 ]]; then
-  echo "Usage: $0 <start_ct_id> <num_cts> <cpu_type> <core_count> [sockets]"
+  echo "Usage: $0 <start_ct_id> <end_ct_id> <cpu_type> <core_count> [sockets]"
   echo "Example:"
-  echo "  $0 400 3 host 4"
+  echo "  $0 400 402 host 4"
   echo "  (Sets containers 400..402 to CPU type=host, 4 cores)"
-  echo "  $0 400 3 host 4 2"
+  echo "  $0 400 402 host 4 2"
   echo "  (Sets containers 400..402 to CPU type=host, 4 cores, 2 sockets)"
   exit 1
 fi
 
-local start_ct_id="$1"
-local num_cts="$2"
-local cpu_type="$3"
-local core_count="$4"
-local sockets="${5:-1}"  # Default to 1 socket if not provided
+START_CT_ID="$1"
+END_CT_ID="$2"
+CPU_TYPE="$3"
+CORE_COUNT="$4"
+SOCKETS="${5:-1}"  # Default to 1 socket if not provided
 
 # --- Basic checks ----------------------------------------------------------
-check_proxmox_and_root  # Must be root and on a Proxmox node
-
-# If a cluster check is needed, uncomment the next line:
-# check_cluster_membership
-
-# --- Ensure required commands are installed --------------------------------
-install_or_prompt "pct"
+check_root
+check_proxmox
+check_cluster_membership
 
 # --- Display summary -------------------------------------------------------
-echo "=== Starting CPU config update for $num_cts container(s) ==="
-echo " - Starting container ID: $start_ct_id"
-echo " - CPU Type: $cpu_type"
-echo " - Core Count: $core_count"
-echo " - Sockets: $sockets"
+echo "=== Starting CPU config update for containers from $START_CT_ID to $END_CT_ID ==="
+echo " - CPU Type: \"$CPU_TYPE\""
+echo " - Core Count: \"$CORE_COUNT\""
+echo " - Sockets: \"$SOCKETS\""
 
 # --- Main Loop -------------------------------------------------------------
-for (( i=0; i<num_cts; i++ )); do
-  local current_ct_id=$(( start_ct_id + i ))
-
-  # Check if container exists
-  if pct config "$current_ct_id" &>/dev/null; then
-    echo "Updating CPU for container $current_ct_id..."
-    pct set "$current_ct_id" -cpu "$cpu_type" -cores "$core_count" -sockets "$sockets"
-    if [[ $? -eq 0 ]]; then
-      echo " - Successfully updated CPU settings for CT $current_ct_id."
+for (( ctId=START_CT_ID; ctId<=END_CT_ID; ctId++ )); do
+  if pct config "$ctId" &>/dev/null; then
+    echo "Updating CPU for container \"$ctId\"..."
+    if pct set "$ctId" -cpu "$CPU_TYPE" -cores "$CORE_COUNT" -sockets "$SOCKETS"; then
+      echo " - Successfully updated CPU settings for CT \"$ctId\"."
     else
-      echo " - Failed to update CPU settings for CT $current_ct_id."
+      echo " - Failed to update CPU settings for CT \"$ctId\"."
     fi
   else
-    echo " - Container $current_ct_id does not exist. Skipping."
+    echo " - Container \"$ctId\" does not exist. Skipping."
   fi
 done
 
 echo "=== Bulk CPU config change process complete! ==="
-
-# --- Prompt to remove installed packages if any were installed in this session
-prompt_keep_installed_packages

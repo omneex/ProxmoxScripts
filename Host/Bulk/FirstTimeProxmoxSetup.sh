@@ -22,7 +22,7 @@
 #   session (if any).
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Preliminary Checks

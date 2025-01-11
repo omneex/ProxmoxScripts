@@ -5,10 +5,10 @@
 # on the specified serial port.
 #
 # Usage:
-# ./setup_serial_console.sh
+# ./VMAddTerminalTTYS0.sh
 #
 # Example:
-#   ./setup_serial_console.sh  # This will create /etc/init/ttyS0.conf and update GRUB to use ttyS0 at 115200 baud rate.
+#   ./VMAddTerminalTTYS0.sh  # This will create /etc/init/ttyS0.conf and update GRUB to use ttyS0 at 115200 baud rate.
 #
 # Steps:
 #   1. Create the /etc/init directory (if it does not exist) and set proper permissions.

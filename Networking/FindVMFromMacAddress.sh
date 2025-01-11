@@ -1,28 +1,44 @@
 #!/bin/bash
 #
-# This script retrieves the network configuration details for all virtual machines (VMs) across all nodes in a Proxmox cluster.
-# It outputs the MAC addresses associated with each VM, helping in network configuration audits or inventory management.
-# The script utilizes the Proxmox VE command-line tool `pvesh` to fetch information in JSON format and parses it using `jq`.
+# FindMacAddress.sh
+#
+# This script retrieves the network configuration details for all virtual machines (VMs) across
+# all nodes in a Proxmox cluster. It outputs the MAC addresses associated with each VM, helping
+# in network configuration audits or inventory management.
 #
 # Usage:
-# Simply run this script on a Proxmox cluster host that has permissions to access the Proxmox VE API:
-# ./FindMacAddress.sh
+#   ./FindMacAddress.sh
+#
+# Example:
+#   # Simply run this script on a Proxmox host within a cluster
+#   ./FindMacAddress.sh
+#
+# The script uses 'pvesh' to fetch JSON data and parses it with 'jq'.
+#
 
-# Get a list of all nodes
-nodes=$(pvesh get /nodes --output-format=json | jq -r '.[] | .node')
+source "$UTILITIES"
 
-# Iterate over each node
+###############################################################################
+# Pre-flight checks
+###############################################################################
+check_root
+check_proxmox
+install_or_prompt "jq"
+check_cluster_membership
+
+###############################################################################
+# Main Logic
+###############################################################################
+nodes="$(pvesh get /nodes --output-format=json | jq -r '.[] | .node')"
+
 for node in $nodes; do
-    echo "Checking node: $node"
-    
-    # Get a list of all VMIDs on the node
-    vmids=$(pvesh get /nodes/$node/qemu --output-format=json | jq -r '.[] | .vmid')
-    
-    # Iterate over each VMID
-    for vmid in $vmids; do
-        echo "VMID: $vmid on Node: $node"
-        
-        # Get network configuration details for each VM
-        pvesh get /nodes/$node/qemu/$vmid/config | grep -i 'net' | grep -i 'macaddr'
-    done
+  echo "Checking node: \"$node\""
+  vmIds="$(pvesh get /nodes/"$node"/qemu --output-format=json | jq -r '.[] | .vmid')"
+  
+  for vmId in $vmIds; do
+    echo "VMID: \"$vmId\" on Node: \"$node\""
+    pvesh get /nodes/"$node"/qemu/"$vmId"/config \
+      | grep -i 'net' \
+      | grep -i 'macaddr'
+  done
 done

@@ -21,7 +21,7 @@
 #   A reboot of the Proxmox host might be required in some cases.
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Preliminary Checks

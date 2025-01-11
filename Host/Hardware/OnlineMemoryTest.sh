@@ -21,7 +21,7 @@
 #   - This script MUST be run as root and on a Proxmox host.
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Preliminary Checks

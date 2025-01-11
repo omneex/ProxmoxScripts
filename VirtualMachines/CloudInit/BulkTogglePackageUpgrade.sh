@@ -4,7 +4,7 @@
 # It updates the Cloud-Init configuration for each VM to set or unset automatic package upgrades.
 #
 # Usage:
-# ./ToggleAutoUpgrade.sh <start_vm_id> <end_vm_id> <enable|disable>
+# ./BulkTogglePackageUpgrade.sh <start_vm_id> <end_vm_id> <enable|disable>
 #
 # Arguments:
 #   start_vm_id - The ID of the first VM to update.
@@ -12,8 +12,8 @@
 #   enable|disable - Set to 'enable' to enable automatic upgrades, or 'disable' to disable them.
 #
 # Example:
-#   ./ToggleAutoUpgrade.sh 400 430 enable
-#   ./ToggleAutoUpgrade.sh 400 430 disable
+#   ./BulkTogglePackageUpgrade.sh 400 430 enable
+#   ./BulkTogglePackageUpgrade.sh 400 430 disable
 
 # Check if the required parameters are provided
 if [ "$#" -ne 3 ]; then

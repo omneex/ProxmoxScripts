@@ -46,7 +46,7 @@
 #     review official Proxmox documentation for recommended upgrade paths and caveats.
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Preliminary Checks via Utilities
@@ -55,9 +55,6 @@ check_root
 check_proxmox
 install_or_prompt "curl"
 check_cluster_membership
-
-# Prompt to possibly remove installed packages at script exit
-trap prompt_keep_installed_packages EXIT
 
 ###############################################################################
 # Argument Parsing
@@ -188,3 +185,5 @@ fi
 
 echo "Repository check, upgrade, and potential distribution switch are complete."
 echo "Script finished successfully."
+
+prompt_keep_installed_packages

@@ -3,14 +3,14 @@
 # This script unmounts all ISO images from the CD/DVD drives for a range of virtual machines (VMs) within a Proxmox VE environment.
 #
 # Usage:
-# ./UnmountISOs.sh <start_vm_id> <end_vm_id>
+# ./BulkUnmountISOs.sh <start_vm_id> <end_vm_id>
 #
 # Arguments:
 #   start_vm_id - The ID of the first VM to update.
 #   end_vm_id - The ID of the last VM to update.
 #
 # Example:
-#   ./UnmountISOs.sh 400 430
+#   ./BulkUnmountISOs.sh 400 430
 
 # Check if the required parameters are provided
 if [ "$#" -ne 2 ]; then

@@ -17,7 +17,7 @@
 #   pvecm add <mon-ip-of-this-node>
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Checks and Setup

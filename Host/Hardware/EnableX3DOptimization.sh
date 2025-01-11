@@ -23,7 +23,7 @@
 #       instructions to make those changes manually.
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 
 ###############################################################################

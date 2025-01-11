@@ -19,7 +19,7 @@
 #     resource definitions will remain.
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # MAIN

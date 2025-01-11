@@ -16,19 +16,11 @@
 #     during this session.
 #
 
-set -e
-
 # Source the utility functions
 source ./Utilities.sh
 
-echo "=== Testing check_proxmox_and_root ==="
 check_proxmox_and_root
-echo "Success: We are root on a Proxmox node."
-
-echo
-echo "=== Testing install_or_prompt (example with 'zip') ==="
 install_or_prompt "zip"
-echo "Success: 'zip' is installed or user agreed to install it."
 
 echo
 echo "=== Testing get_remote_node_ips ==="

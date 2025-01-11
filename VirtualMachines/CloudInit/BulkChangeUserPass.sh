@@ -4,7 +4,7 @@
 # It allows you to set a new username (optional) and password (required) for each VM and regenerates the Cloud-Init image to apply the changes.
 #
 # Usage:
-# ./UpdateVMUserPass.sh <start_vm_id> <end_vm_id> <password> [username]
+# ./BulkChangeUserPass.sh <start_vm_id> <end_vm_id> <password> [username]
 #
 # Arguments:
 #   start_vm_id - The ID of the first VM to update.
@@ -13,8 +13,8 @@
 #   username - Optional. The new username for the VM. If not provided, the existing username will be used.
 #
 # Example:
-#   ./UpdateVMUserPass.sh 400 430 myNewPassword newuser
-#   ./UpdateVMUserPass.sh 400 430 myNewPassword # Without specifying a username
+#   ./BulkChangeUserPass.sh 400 430 myNewPassword newuser
+#   ./BulkChangeUserPass.sh 400 430 myNewPassword # Without specifying a username
 
 # Check if the minimum required parameters are provided
 if [ "$#" -lt 3 ]; then

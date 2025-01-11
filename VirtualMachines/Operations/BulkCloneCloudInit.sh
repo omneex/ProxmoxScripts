@@ -6,7 +6,7 @@
 # standardized configuration.
 #
 # Usage:
-# ./CloneVMs.sh <source_vm_id> <base_vm_name> <start_vm_id> <num_vms> <start_ip/cidr> <bridge> [gateway] [pool_name]
+# ./BulkCloneCloudInit.sh <source_vm_id> <base_vm_name> <start_vm_id> <num_vms> <start_ip/cidr> <bridge> [gateway] [pool_name]
 #
 # Arguments:
 #   source_vm_id - The ID of the VM that will be cloned.
@@ -19,8 +19,8 @@
 #   pool_name - Optional. The name of the pool to which the new VMs will be added. If not provided, VMs are not added to any pool.
 #
 # Example:
-#   ./CloneVMs.sh 110 Ubuntu-2C-20GB 400 30 192.168.1.50/24 vmbr0 192.168.1.1 PoolName
-#   ./CloneVMs.sh 110 Ubuntu-2C-20GB 400 30 192.168.1.50/24 vmbr0 # Without specifying a gateway or pool
+#   ./BulkCloneCloudInit.sh 110 Ubuntu-2C-20GB 400 30 192.168.1.50/24 vmbr0 192.168.1.1 PoolName
+#   ./BulkCloneCloudInit.sh 110 Ubuntu-2C-20GB 400 30 192.168.1.50/24 vmbr0 # Without specifying a gateway or pool
 
 # Check if the minimum required parameters are provided
 if [ "$#" -lt 6 ]; then

@@ -4,7 +4,7 @@
 # By default, it will use the current CPU type unless specified.
 #
 # Usage:
-# ./SetCPUConfig.sh <start_vm_id> <end_vm_id> <num_cores> [cpu_type]
+# ./BulkSetCPUTypeCoreCount.sh <start_vm_id> <end_vm_id> <num_cores> [cpu_type]
 #
 # Arguments:
 #   start_vm_id - The ID of the first VM to update.
@@ -13,8 +13,8 @@
 #   cpu_type - Optional. The CPU type to set for each VM. If not provided, the current CPU type will be retained.
 #
 # Example:
-#   ./SetCPUConfig.sh 400 430 4
-#   ./SetCPUConfig.sh 400 430 4 host
+#   ./BulkSetCPUTypeCoreCount.sh 400 430 4
+#   ./BulkSetCPUTypeCoreCount.sh 400 430 4 host
 
 # Check if the required parameters are provided
 if [ "$#" -lt 3 ] || [ "$#" -gt 4 ]; then

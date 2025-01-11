@@ -1,59 +1,68 @@
 #!/bin/bash
 #
+# CephEditCrushmap.sh
+#
 # This script manages the decompilation and recompilation of the Ceph cluster's CRUSH map,
-# facilitating custom modifications. The script supports commands to either decompile the 
-# current CRUSH map from a compiled state into a human-readable format or recompile it back 
-# into a format that can be set in the cluster. It is useful for administrators needing to 
-# manually adjust CRUSH maps, which control data placement in the cluster.
+# facilitating custom modifications. Administrators can either decompile the current CRUSH
+# map into a human-readable format or recompile it for use in the cluster.
 #
 # Usage:
-# ./CephEditCrushmap.sh <command>
-#   command - 'decompile' to convert the CRUSH map to a readable format,
-#             'compile' to convert it back to a binary format used by Ceph.
+#   ./CephEditCrushmap.sh <command>
+#
 # Examples:
+#   # Decompile the CRUSH map
 #   ./CephEditCrushmap.sh decompile
+#
+#   # Recompile the CRUSH map
 #   ./CephEditCrushmap.sh compile
+#
+source "$UTILITIES"
 
-# Check if the command is provided
-if [ -z "$1" ]; then
-    echo "Usage: $0 <command>"
-    echo "command can be 'decompile' or 'compile'"
+###############################################################################
+# Environment Checks
+###############################################################################
+check_root
+check_proxmox
+
+###############################################################################
+# Variables
+###############################################################################
+userCommand="$1"
+
+###############################################################################
+# Functions
+###############################################################################
+function decompileCrushMap() {
+    echo "Getting and decompiling the CRUSH map..."
+    ceph osd getcrushmap -o "/tmp/crushmap.comp"
+    crushtool -d "/tmp/crushmap.comp" -o "/tmp/crushmap.decomp"
+    echo "Decompiled CRUSH map is at /tmp/crushmap.decomp"
+}
+
+function recompileCrushMap() {
+    echo "Recompiling and setting the CRUSH map..."
+    crushtool -c "/tmp/crushmap.decomp" -o "/tmp/crushmap.comp"
+    ceph osd setcrushmap -i "/tmp/crushmap.comp"
+    echo "CRUSH map has been recompiled and set."
+}
+
+###############################################################################
+# Main Logic
+###############################################################################
+if [ -z "$userCommand" ]; then
+    echo "Error: Missing command. Use 'decompile' or 'compile'."
     exit 1
 fi
 
-COMMAND="$1"
-
-# Functions for decompiling and recompiling the crush map
-function decompile_crush_map() {
-    echo "Getting and decompiling the crush map..."
-    # Fetch the current crush map
-    ceph osd getcrushmap -o /tmp/crushmap.comp
-
-    # Decompile it
-    crushtool -d /tmp/crushmap.comp -o /tmp/crushmap.decomp
-    echo "Decompiled crush map is at /tmp/crushmap.decomp"
-}
-
-function recompile_crush_map() {
-    echo "Recompiling and setting the crush map..."
-    # Recompile the crush map
-    crushtool -c /tmp/crushmap.decomp -o /tmp/crushmap.comp
-
-    # Set it in the cluster
-    ceph osd setcrushmap -i /tmp/crushmap.comp
-    echo "Crush map has been recompiled and set."
-}
-
-# Main logic based on input command
-case "$COMMAND" in
+case "$userCommand" in
     decompile)
-        decompile_crush_map
+        decompileCrushMap
         ;;
     compile)
-        recompile_crush_map
+        recompileCrushMap
         ;;
     *)
-        echo "Invalid command. Use 'decompile' or 'compile'."
+        echo "Error: Invalid command. Use 'decompile' or 'compile'."
         exit 2
         ;;
 esac

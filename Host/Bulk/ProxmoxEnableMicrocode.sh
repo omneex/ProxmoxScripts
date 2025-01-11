@@ -16,7 +16,7 @@
 #   3. Prompts to keep or remove installed packages afterward.
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Preliminary Checks

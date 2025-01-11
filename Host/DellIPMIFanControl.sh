@@ -20,7 +20,7 @@
 # This script requires IPMI utilities, which will be installed if missing.
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Global Variables

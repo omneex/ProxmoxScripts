@@ -24,7 +24,7 @@
 #   5. After making changes, stop and start each container for them to take effect (pct stop <CTID> && pct start <CTID>).
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # Preliminary Checks

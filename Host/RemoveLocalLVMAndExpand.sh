@@ -29,7 +29,7 @@
 #   # to occupy the freed space.
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # MAIN

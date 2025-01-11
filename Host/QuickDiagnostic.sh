@@ -19,7 +19,7 @@
 #   - The script uses standard Linux tools (dmesg, free, ps, top, journalctl) to gather info.
 #
 
-source $UTILITIES
+source "$UTILITIES"
 
 ###############################################################################
 # FUNCTIONS
@@ -173,39 +173,25 @@ check_system_log_errors() {
 ###############################################################################
 # MAIN
 ###############################################################################
-main() {
-    echo "Starting system error check..."
+echo "Starting system error check..."
 
-    # Ensure this is a Proxmox node, ensure script is run as root
-    check_root
-    check_proxmox
+# Ensure this is a Proxmox node, ensure script is run as root
+check_root
+check_proxmox
 
-    # Prompt to install packages not in a default Proxmox 8 install
-    # If user declines, relevant checks will be skipped
-    if ! command -v zpool &>/dev/null; then
-        install_or_prompt "zfsutils-linux"
-    fi
-    if ! command -v ceph &>/dev/null; then
-        install_or_prompt "ceph-common"
-    fi
-    if ! command -v lvs &>/dev/null; then
-        install_or_prompt "lvm2"
-    fi
-    if ! command -v journalctl &>/dev/null; then
-        install_or_prompt "systemd"
-    fi
+# Prompt to install packages not in a default Proxmox 8 install
+# If user declines, relevant checks will be skipped
+install_or_prompt "zfsutils-linux"
+install_or_prompt "lvm2"
 
-    # Run checks
-    check_storage_errors
-    check_memory_errors
-    check_cpu_errors
-    check_network_errors
-    check_system_log_errors
+# Run checks
+check_storage_errors
+check_memory_errors
+check_cpu_errors
+check_network_errors
+check_system_log_errors
 
-    echo "System error check completed!"
+echo "System error check completed!"
 
-    # Prompt to remove installed packages if any were installed during this session
-    prompt_keep_installed_packages
-}
-
-main
+# Prompt to remove installed packages if any were installed during this session
+prompt_keep_installed_packages
