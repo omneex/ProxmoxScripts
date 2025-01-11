@@ -46,6 +46,8 @@
 #     review official Proxmox documentation for recommended upgrade paths and caveats.
 #
 
+source $UTILITIES
+
 ###############################################################################
 # Preliminary Checks via Utilities
 ###############################################################################

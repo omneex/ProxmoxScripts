@@ -22,12 +22,16 @@
 #   session (if any).
 #
 
+source $UTILITIES
+
 ###############################################################################
 # Preliminary Checks
 ###############################################################################
 check_root
 check_proxmox
 check_cluster_membership
+
+ceph_version="ceph-squid"
 
 ###############################################################################
 # Functions
@@ -44,17 +48,17 @@ setup_repositories() {
     fi
 
     # Remove the Ceph enterprise repository if it exists
-    if [[ -f "/etc/apt/sources.list.d/ceph-enterprise.list" ]]; then
-        rm "/etc/apt/sources.list.d/ceph-enterprise.list"
+    if [[ -f "/etc/apt/sources.list.d/ceph.list" ]]; then
+        rm "/etc/apt/sources.list.d/ceph.list"
         echo " - Removed Ceph enterprise repository."
     fi
 
     # Attempt to detect the codename from /etc/os-release
-    local codename="bullseye"
+    local codename="bookworm"
     if [[ -f "/etc/os-release" ]]; then
         # shellcheck source=/dev/null
         . "/etc/os-release"
-        codename="${VERSION_CODENAME:-bullseye}"
+        codename="${VERSION_CODENAME:-bookworm}"
     else
         echo " - /etc/os-release not found. Defaulting to \"${codename}\"."
     fi
@@ -67,6 +71,14 @@ setup_repositories() {
         echo " - Added Proxmox no-subscription repository for \"${codename}\"."
     else
         echo " - Proxmox no-subscription repository already present."
+    fi
+
+    # Check if the no-subscription repo is already in /etc/apt/sources.list.d/ceph.list
+    if ! grep -q "deb http://download.proxmox.com/debian/${ceph_version} ${codename} no-subscription" "/etc/apt/sources.list.d/ceph.list"; then
+        echo "deb http://download.proxmox.com/debian/${ceph_version} ${codename} no-subscription" >> "/etc/apt/sources.list.d/ceph.list"
+        echo " - Added Ceph no-subscription repository for \"${codename}\"."
+    else
+        echo " - Ceph no-subscription repository already present."
     fi
 }
 
@@ -112,3 +124,9 @@ echo "Proxmox first-time setup completed for all reachable nodes!"
 # Prompt to keep or remove packages installed during this session
 ###############################################################################
 prompt_keep_installed_packages
+
+###############################################################################
+# Testing status
+###############################################################################
+# Tested single-node
+# Tested multi-node

@@ -20,6 +20,8 @@
 #   5. Set the specified timezone on each remote node and then on the local node.
 #
 
+source $UTILITIES
+
 ###############################################################################
 # Pre-flight checks
 ###############################################################################

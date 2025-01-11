@@ -182,14 +182,31 @@ run_script() {
     echo "=== Running: $(display_path "$script_path") $param_line ==="
 
     IFS=' ' read -r -a param_array <<<"$param_line"
+    
+    # Remove any trailing \r
+    param_line=$(echo "$param_line" | tr -d '\r')
 
+    mkdir -p .log
+    touch .log/out.log
+
+    export UTILITIES="$(realpath ./Utilities/Utilities.sh)"
+
+    # Build an escaped command string for script -c
+    escaped_args=()
+    for arg in "${param_array[@]}"; do
+        escaped_args+=( "$(printf '%q' "$arg")" )
+    done
+
+    # Now join them in one string
+    cmd_string="$(printf '%s ' "${escaped_args[@]}")"
+    cmd_string="${script_path} ${cmd_string}"
+
+    script -q -c "$cmd_string" .log/out.log
+    
     # Capture script output in an array, to truncate if needed
     declare -a output_lines
-    if [ -x "$script_path" ]; then
-        mapfile -t output_lines < <("$script_path" "${param_array[@]}")
-    else
-        mapfile -t output_lines < <(bash "$script_path" "${param_array[@]}")
-    fi
+    mapfile -t output_lines < <(sed '/^Script started on /d; /^Script done on /d' .log/out.log)
+    rm .log/out.log
 
     LAST_SCRIPT="$(display_path "$script_path")"
 
@@ -202,19 +219,18 @@ run_script() {
         # Show first 3 lines, then '...', then last 9 lines
         local truncated_output=""
         for (( i=0; i<3; i++ )); do
-            truncated_output+="${output_lines[$i]}\n"
+            truncated_output+="${output_lines[$i]}"
+            truncated_output+=$'\n'
         done
         truncated_output+="...\n"
         local start_index=$(( total_lines - 9 ))
         for (( i=start_index; i<total_lines; i++ )); do
-            truncated_output+="${output_lines[$i]}\n"
+            truncated_output+="${output_lines[$i]}"
+            truncated_output+=$'\n'
         done
         LAST_OUTPUT="$truncated_output"
     fi
 
-    # Print the truncated output to the screen
-    echo -e "$LAST_OUTPUT"
-    echo
     echo "Press Enter to continue."
     read -r
 }
@@ -286,6 +302,7 @@ navigate() {
                 echo "Exiting..."
                 exit 0
             else
+                echo "Going up..."
                 return
             fi
         fi
@@ -340,7 +357,10 @@ navigate() {
 ###############################################################################
 
 # Begin with updating the repositories
-apt update
+apt update | true
+
+# Make the script folder executable
+./MakeScriptsExecutable.sh
 
 # Start navigation from the current directory
 navigate "$BASE_DIR"

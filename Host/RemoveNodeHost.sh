@@ -19,6 +19,9 @@
 #   pvecm add <IP-of-other-cluster-node>
 #
 # CAUTION: This is destructive—your node will no longer be part of any cluster.
+#
+
+source $UTILITIES
 
 ###############################################################################
 # MAIN

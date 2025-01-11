@@ -14,7 +14,6 @@ set -e
 # Array to keep track of packages installed by install_or_prompt() in this session.
 SESSION_INSTALLED_PACKAGES=()
 
-
 ###############################################################################
 # 1. Misc Functions
 ###############################################################################
@@ -46,7 +45,6 @@ check_proxmox() {
         exit 2
     fi
 }
-
 
 # --- Install or Prompt Function --------------------------------------------
 # @function install_or_prompt
@@ -161,7 +159,20 @@ get_number_of_cluster_nodes() {
     echo "$(pvecm nodes | awk '/^[[:space:]]*[0-9]/ {count++} END {print count}')"
 }
 
+wait_spin() {
+    local -a seconds=()
+    spinner="/-\|"
 
+    for ((i = 0; i < seconds; i++)); do
+        # Pick the spinner character based on i
+        index=$((i % ${#spinner}))
+
+        # \r returns cursor to start of line; overwrite with next spinner character
+        printf "\r%s" "${spinner:index:1}"
+
+        sleep 1
+    done
+}
 
 ###############################################################################
 # 2. IP CONVERSION UTILITIES
@@ -177,7 +188,7 @@ get_number_of_cluster_nodes() {
 #   Prints the 32-bit integer representation of the IP to stdout.
 ip_to_int() {
     local a b c d
-    IFS=. read -r a b c d <<< "$1"
+    IFS=. read -r a b c d <<<"$1"
     echo "$((a * 256 ** 3 + b * 256 ** 2 + c * 256 + d))"
 }
 
@@ -192,10 +203,10 @@ ip_to_int() {
 int_to_ip() {
     local ip
     ip=$(printf "%d.%d.%d.%d" \
-        "$(( ($1 >> 24) & 255 ))" \
-        "$(( ($1 >> 16) & 255 ))" \
-        "$(( ($1 >> 8)  & 255 ))" \
-        "$((  $1        & 255 ))")
+        "$((($1 >> 24) & 255))" \
+        "$((($1 >> 16) & 255))" \
+        "$((($1 >> 8) & 255))" \
+        "$(($1 & 255))")
     echo "$ip"
 }
 
@@ -221,62 +232,62 @@ MAPPINGS_INITIALIZED=0
 #   if maps are not yet built.
 # ---------------------------------------------------------------------------
 init_node_mappings() {
-  # Clear arrays in case this function is rerun
-  NODEID_TO_IP=()
-  NODEID_TO_NAME=()
-  NAME_TO_IP=()
-  IP_TO_NAME=()
+    # Clear arrays in case this function is rerun
+    NODEID_TO_IP=()
+    NODEID_TO_NAME=()
+    NAME_TO_IP=()
+    IP_TO_NAME=()
 
-  # 1) Build { nodeid_decimal => IP } from `pvecm status`
-  #    Example lines:
-  #    0x00000001          1 172.20.83.21
-  while IFS= read -r line; do
-    # Each line has 3+ fields:
-    #   $1=0xHEX, $2=Votes, $3=IP (possibly with '(local)')
-    # We extract nodeid_hex and ip.
-    # Example: "0x00000001          1 172.20.83.21"
-    nodeid_hex=$(awk '{print $1}' <<< "$line")
-    ip_part=$(awk '{print $3}' <<< "$line")
+    # 1) Build { nodeid_decimal => IP } from `pvecm status`
+    #    Example lines:
+    #    0x00000001          1 172.20.83.21
+    while IFS= read -r line; do
+        # Each line has 3+ fields:
+        #   $1=0xHEX, $2=Votes, $3=IP (possibly with '(local)')
+        # We extract nodeid_hex and ip.
+        # Example: "0x00000001          1 172.20.83.21"
+        nodeid_hex=$(awk '{print $1}' <<<"$line")
+        ip_part=$(awk '{print $3}' <<<"$line")
 
-    # Strip "(local)" from the IP if present
-    ip_part="${ip_part//(local)/}"
+        # Strip "(local)" from the IP if present
+        ip_part="${ip_part//(local)/}"
 
-    # Convert hex nodeid to decimal (e.g., 0x00000001 -> 1)
-    nodeid_dec=$((16#${nodeid_hex#0x}))
+        # Convert hex nodeid to decimal (e.g., 0x00000001 -> 1)
+        nodeid_dec=$((16#${nodeid_hex#0x}))
 
-    # Store in associative array
-    NODEID_TO_IP["$nodeid_dec"]="$ip_part"
-  done < <(pvecm status 2>/dev/null | awk '/^0x/{print}')
+        # Store in associative array
+        NODEID_TO_IP["$nodeid_dec"]="$ip_part"
+    done < <(pvecm status 2>/dev/null | awk '/^0x/{print}')
 
-  # 2) Build { nodeid_decimal => Name } from `pvecm nodes`
-  #    Example lines:
-  #    1          1 IHK01
-  while IFS= read -r line; do
-    # Each line has 3+ fields:
-    #   $1=nodeid_decimal, $2=Votes, $3=Name (possibly with '(local)')
-    nodeid_dec=$(awk '{print $1}' <<< "$line")
-    name_part=$(awk '{print $3}' <<< "$line")
+    # 2) Build { nodeid_decimal => Name } from `pvecm nodes`
+    #    Example lines:
+    #    1          1 IHK01
+    while IFS= read -r line; do
+        # Each line has 3+ fields:
+        #   $1=nodeid_decimal, $2=Votes, $3=Name (possibly with '(local)')
+        nodeid_dec=$(awk '{print $1}' <<<"$line")
+        name_part=$(awk '{print $3}' <<<"$line")
 
-    # Strip "(local)" from the name if present
-    name_part="${name_part//(local)/}"
+        # Strip "(local)" from the name if present
+        name_part="${name_part//(local)/}"
 
-    # Store in associative array
-    NODEID_TO_NAME["$nodeid_dec"]="$name_part"
-  done < <(pvecm nodes 2>/dev/null | awk '/^[[:space:]]*[0-9]/ {print}')
+        # Store in associative array
+        NODEID_TO_NAME["$nodeid_dec"]="$name_part"
+    done < <(pvecm nodes 2>/dev/null | awk '/^[[:space:]]*[0-9]/ {print}')
 
-  # 3) Combine them into NAME_TO_IP and IP_TO_NAME
-  for nodeid in "${!NODEID_TO_NAME[@]}"; do
-    local name="${NODEID_TO_NAME[$nodeid]}"
-    local ip="${NODEID_TO_IP[$nodeid]}"
+    # 3) Combine them into NAME_TO_IP and IP_TO_NAME
+    for nodeid in "${!NODEID_TO_NAME[@]}"; do
+        local name="${NODEID_TO_NAME[$nodeid]}"
+        local ip="${NODEID_TO_IP[$nodeid]}"
 
-    # Skip if either is empty (meaning we didn’t find a match in the other command)
-    if [[ -n "$name" && -n "$ip" ]]; then
-      NAME_TO_IP["$name"]="$ip"
-      IP_TO_NAME["$ip"]="$name"
-    fi
-  done
+        # Skip if either is empty (meaning we didn’t find a match in the other command)
+        if [[ -n "$name" && -n "$ip" ]]; then
+            NAME_TO_IP["$name"]="$ip"
+            IP_TO_NAME["$ip"]="$name"
+        fi
+    done
 
-  MAPPINGS_INITIALIZED=1
+    MAPPINGS_INITIALIZED=1
 }
 
 # ---------------------------------------------------------------------------
@@ -291,24 +302,24 @@ init_node_mappings() {
 #   Prints the IP to stdout or exits 1 if not found.
 # ---------------------------------------------------------------------------
 get_ip_from_name() {
-  local node_name="$1"
-  if [[ -z "$node_name" ]]; then
-    echo "Error: get_ip_from_name requires a node name argument." >&2
-    return 1
-  fi
+    local node_name="$1"
+    if [[ -z "$node_name" ]]; then
+        echo "Error: get_ip_from_name requires a node name argument." >&2
+        return 1
+    fi
 
-  # Initialize mappings if not done yet
-  if [[ "$MAPPINGS_INITIALIZED" -eq 0 ]]; then
-    init_node_mappings
-  fi
+    # Initialize mappings if not done yet
+    if [[ "$MAPPINGS_INITIALIZED" -eq 0 ]]; then
+        init_node_mappings
+    fi
 
-  local ip="${NAME_TO_IP[$node_name]}"
-  if [[ -z "$ip" ]]; then
-    echo "Error: Could not find IP for node name '$node_name'." >&2
-    return 1
-  fi
+    local ip="${NAME_TO_IP[$node_name]}"
+    if [[ -z "$ip" ]]; then
+        echo "Error: Could not find IP for node name '$node_name'." >&2
+        return 1
+    fi
 
-  echo "$ip"
+    echo "$ip"
 }
 
 # ---------------------------------------------------------------------------
@@ -323,24 +334,24 @@ get_ip_from_name() {
 #   Prints the node name to stdout or exits 1 if not found.
 # ---------------------------------------------------------------------------
 get_name_from_ip() {
-  local node_ip="$1"
-  if [[ -z "$node_ip" ]]; then
-    echo "Error: get_name_from_ip requires an IP argument." >&2
-    return 1
-  fi
+    local node_ip="$1"
+    if [[ -z "$node_ip" ]]; then
+        echo "Error: get_name_from_ip requires an IP argument." >&2
+        return 1
+    fi
 
-  # Initialize mappings if not done yet
-  if [[ "$MAPPINGS_INITIALIZED" -eq 0 ]]; then
-    init_node_mappings
-  fi
+    # Initialize mappings if not done yet
+    if [[ "$MAPPINGS_INITIALIZED" -eq 0 ]]; then
+        init_node_mappings
+    fi
 
-  local name="${IP_TO_NAME[$node_ip]}"
-  if [[ -z "$name" ]]; then
-    echo "Error: Could not find node name for IP '$node_ip'." >&2
-    return 1
-  fi
+    local name="${IP_TO_NAME[$node_ip]}"
+    if [[ -z "$name" ]]; then
+        echo "Error: Could not find node name for IP '$node_ip'." >&2
+        return 1
+    fi
 
-  echo "$name"
+    echo "$name"
 }
 
 ###############################################################################
@@ -359,8 +370,8 @@ get_cluster_lxc() {
     local -a container_ids=()
     while IFS= read -r vmid; do
         container_ids+=("$vmid")
-    done < <(pvesh get /cluster/resources --type lxc --output-format json 2>/dev/null \
-                | awk -F'[:,"]' '/"vmid"/ {gsub(/ /,"",$3); print $3}' )
+    done < <(pvesh get /cluster/resources --type lxc --output-format json 2>/dev/null |
+        awk -F'[:,"]' '/"vmid"/ {gsub(/ /,"",$3); print $3}')
 
     for id in "${container_ids[@]}"; do
         echo "$id"
@@ -388,8 +399,8 @@ get_server_lxc() {
     local -a container_ids=()
     while IFS= read -r vmid; do
         container_ids+=("$vmid")
-    done < <(pvesh get "/nodes/${server}/lxc" --output-format json 2>/dev/null \
-                | awk -F'[:,"]' '/"vmid"/ {gsub(/ /,"",$3); print $3}' )
+    done < <(pvesh get "/nodes/${server}/lxc" --output-format json 2>/dev/null |
+        awk -F'[:,"]' '/"vmid"/ {gsub(/ /,"",$3); print $3}')
 
     for id in "${container_ids[@]}"; do
         echo "$id"
@@ -408,8 +419,8 @@ get_cluster_vms() {
     local -a vm_ids=()
     while IFS= read -r vmid; do
         vm_ids+=("$vmid")
-    done < <(pvesh get /cluster/resources --type vm --output-format json 2>/dev/null \
-                | awk -F'[:,"]' '/"vmid"/ {gsub(/ /,"",$3); print $3}' )
+    done < <(pvesh get /cluster/resources --type vm --output-format json 2>/dev/null |
+        awk -F'[:,"]' '/"vmid"/ {gsub(/ /,"",$3); print $3}')
 
     for id in "${vm_ids[@]}"; do
         echo "$id"
@@ -437,8 +448,8 @@ get_server_vms() {
     local -a vm_ids=()
     while IFS= read -r vmid; do
         vm_ids+=("$vmid")
-    done < <(pvesh get "/nodes/${server}/qemu" --output-format json 2>/dev/null \
-                | awk -F'[:,"]' '/"vmid"/ {gsub(/ /,"",$3); print $3}' )
+    done < <(pvesh get "/nodes/${server}/qemu" --output-format json 2>/dev/null |
+        awk -F'[:,"]' '/"vmid"/ {gsub(/ /,"",$3); print $3}')
 
     for id in "${vm_ids[@]}"; do
         echo "$id"

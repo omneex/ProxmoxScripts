@@ -19,6 +19,9 @@
 #   - Running this script may temporarily reduce available memory for other processes.
 #   - For best results, stop or pause non-critical workloads before testing.
 #   - This script MUST be run as root and on a Proxmox host.
+#
+
+source $UTILITIES
 
 ###############################################################################
 # Preliminary Checks

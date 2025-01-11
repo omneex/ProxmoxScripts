@@ -34,6 +34,8 @@
 #   - cpupower (recommended) or sysfs-based access to CPU freq scaling.
 #
 
+source $UTILITIES
+
 ###############################################################################
 # Globals / Defaults
 ###############################################################################

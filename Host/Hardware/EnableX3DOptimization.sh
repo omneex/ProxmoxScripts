@@ -22,6 +22,10 @@
 # NOTE: This script cannot directly configure BIOS/UEFI. Please follow the on-screen
 #       instructions to make those changes manually.
 #
+
+source $UTILITIES
+
+
 ###############################################################################
 # Preliminary Checks
 ###############################################################################

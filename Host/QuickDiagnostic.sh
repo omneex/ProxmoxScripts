@@ -19,6 +19,8 @@
 #   - The script uses standard Linux tools (dmesg, free, ps, top, journalctl) to gather info.
 #
 
+source $UTILITIES
+
 ###############################################################################
 # FUNCTIONS
 ###############################################################################

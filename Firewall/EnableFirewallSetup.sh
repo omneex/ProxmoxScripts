@@ -19,10 +19,7 @@
 #   ./EnableFirewallSetup.sh 192.168.1.0/24
 #
 
-###############################################################################
-# Prompt to optionally remove newly installed packages at script exit
-###############################################################################
-trap prompt_keep_installed_packages EXIT
+source $UTILITIES
 
 ###############################################################################
 # CONFIGURATION

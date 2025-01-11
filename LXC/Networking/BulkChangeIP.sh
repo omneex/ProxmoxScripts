@@ -27,6 +27,9 @@
 #   - Must be run as root on a Proxmox node.
 #   - 'pct' is required (part of the PVE/LXC utilities).
 #   - IP increment logic uses Utilities.sh (ip_to_int, int_to_ip) for consistency.
+#
+
+source $UTILITIES
 
 ###############################################################################
 # MAIN

@@ -16,6 +16,8 @@
 #   3. Prompts to keep or remove installed packages afterward.
 #
 
+source $UTILITIES
+
 ###############################################################################
 # Preliminary Checks
 ###############################################################################
@@ -59,3 +61,10 @@ echo "Microcode updates enabled on the local node."
 prompt_keep_installed_packages
 
 echo "Microcode updates have been enabled on all nodes!"
+
+
+###############################################################################
+# Testing status
+###############################################################################
+# Tested single-node
+# Tested multi-node

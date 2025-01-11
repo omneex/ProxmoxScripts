@@ -24,6 +24,9 @@
 #
 # Make sure to run this script on a Proxmox node that has direct access to PWM
 # fan control (e.g., /sys/class/hwmon/).
+#
+
+source $UTILITIES
 
 ###############################################################################
 # Preliminary Checks

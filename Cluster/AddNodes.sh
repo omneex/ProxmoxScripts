@@ -29,15 +29,16 @@
 #      The password is never echoed to the terminal.
 #
 
+set +e
+
+source $UTILITIES
+
 ###############################################################################
 # Preliminary Checks
 ###############################################################################
 check_root              # Ensure we're running as root
 check_proxmox           # Ensure we're on a valid Proxmox node
-install_or_prompt "expect"  # Required for automated password entry
 check_cluster_membership     # Ensure this node is part of a cluster
-
-trap prompt_keep_installed_packages EXIT
 
 ###############################################################################
 # Argument Parsing
@@ -53,6 +54,8 @@ shift
 declare -a NODES=()
 USE_LINK1=false
 declare -a LINK1=()
+
+echo $NODES
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -80,51 +83,29 @@ if $USE_LINK1; then
   done
 fi
 
-###############################################################################
-# Prompt for New Nodes' Root Password
-###############################################################################
-echo -n "Enter the 'root' SSH password for the NEW node(s): "
-read -s NODE_PASSWORD
-echo
+echo "DEBUG: CLUSTER_IP = '$CLUSTER_IP'"
+echo "DEBUG: NODES = ${NODES[*]}"
 
 ###############################################################################
 # Main Logic
 ###############################################################################
+
 COUNTER=0
 for NODE_IP in "${NODES[@]}"; do
   echo "-----------------------------------------------------------------"
   echo "Adding new node: \"$NODE_IP\""
 
   CMD="pvecm add \"$CLUSTER_IP\" --link0 \"$NODE_IP\""
-  if $USE_LINK1; then
+  if [ "$USE_LINK1" = "true" ]; then
     CMD+=" --link1 \"${LINK1[$COUNTER]}\""
     echo "  Using link1: \"${LINK1[$COUNTER]}\""
   fi
 
   echo "  SSHing into \"$NODE_IP\" and executing: $CMD"
   
-  /usr/bin/expect <<EOF
-    set timeout -1
-    log_user 0
-
-    spawn ssh -o StrictHostKeyChecking=no root@${NODE_IP} $CMD
-
-    expect {
-      -re ".*continue connecting.*" {
-        send "yes\r"
-        exp_continue
-      }
-      -re ".*assword:.*" {
-        send "${NODE_PASSWORD}\r"
-      }
-    }
-
-    expect {
-      eof
-    }
-EOF
-
-  ((COUNTER++))
+  (ssh -t -o StrictHostKeyChecking=no root@${NODE_IP} $CMD) || true
+  
+  COUNTER=$((COUNTER + 1))
   echo "Node \"$NODE_IP\" add procedure completed."
   echo
 done
@@ -132,3 +113,10 @@ done
 echo "=== All new nodes have been processed. ==="
 echo "You can verify cluster status on each node by running: pvecm status"
 echo "Or from this cluster node, check: pvecm status"
+
+
+###############################################################################
+# Testing status
+###############################################################################
+# Tested single-node
+# Tested multi-node

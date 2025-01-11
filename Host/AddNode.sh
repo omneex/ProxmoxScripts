@@ -24,6 +24,9 @@
 #
 # Note: This script removes any ringX/ringY references and simply uses
 #       the '--link0' parameter if you provide a <local-node-IP>.
+#
+
+source $UTILITIES
 
 ###############################################################################
 # MAIN

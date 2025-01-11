@@ -19,6 +19,9 @@
 #   VM that you want to run nested hypervisors inside of. For example:
 #       qm set <VMID> --cpu host
 #   A reboot of the Proxmox host might be required in some cases.
+#
+
+source $UTILITIES
 
 ###############################################################################
 # Preliminary Checks

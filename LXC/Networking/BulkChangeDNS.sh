@@ -15,6 +15,9 @@
 #   - You can pass more than two DNS servers if desired. They get appended.
 #   - If you want to specify a single DNS server, omit the rest.
 #   - Must be run as root on a Proxmox node.
+#
+
+source $UTILITIES
 
 ###############################################################################
 # MAIN

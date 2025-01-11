@@ -17,6 +17,8 @@
 #   - The script relies on utility functions that must be sourced elsewhere.
 #
 
+source $UTILITIES
+
 ###############################################################################
 # MAIN
 ###############################################################################

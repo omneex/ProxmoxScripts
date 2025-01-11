@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# RemoveNodeCluster.sh
+# RemoveClusterNode.sh
 #
 # Safely remove a node from a Proxmox cluster by:
 #   - Checking if the node has VMs/containers, and refusing removal unless --force is given.
@@ -9,15 +9,17 @@
 #   - Allowing a future re-add of a node with the same name without leftover SSH conflicts.
 #
 # Usage:
-#   ./RemoveNodeCluster.sh [--force] <node_name>
+#   ./RemoveClusterNode.sh [--force] <node_name>
 #
 # Examples:
 #   # Normal removal, will refuse if the node has VMs/LXCs:
-#   ./RemoveNodeCluster.sh node3
+#   ./RemoveClusterNode.sh node3
 #
 #   # Force removal, ignoring the presence of VMs/LXCs:
-#   ./RemoveNodeCluster.sh --force node3
+#   ./RemoveClusterNode.sh --force node3
 #
+
+source $UTILITIES
 
 ###############################################################################
 # Preliminary Checks
@@ -83,6 +85,16 @@ fi
 ###############################################################################
 echo "=== Removing node \"${NODE_NAME}\" from the cluster ==="
 
+HOST=$(get_ip_from_name ${NODE_NAME}) || true
+
+(ssh -t -o StrictHostKeyChecking=no root@${HOST} \
+"systemctl stop pve-cluster corosync \
+  && pmxcfs -l \
+  && rm -r /etc/corosync/* \
+  && rm -r /etc/pve/corosync.conf \
+  && killall pmxcfs \
+  && systemctl start pve-cluster") || true
+
 # 1) Remove node from the Corosync membership
 echo "Running: pvecm delnode ${NODE_NAME}"
 if ! pvecm delnode "${NODE_NAME}"; then
@@ -90,14 +102,25 @@ if ! pvecm delnode "${NODE_NAME}"; then
   echo "Continuing with SSH cleanup..."
 fi
 
-# 2) Remove /etc/pve/nodes/<NODE_NAME> locally if it exists
-if [[ -d "/etc/pve/nodes/${NODE_NAME}" ]]; then
-  echo "Removing local /etc/pve/nodes/${NODE_NAME} ..."
-  rm -rf "/etc/pve/nodes/${NODE_NAME}"
+node_count="$(get_number_of_cluster_nodes)"
+if  [ "$node_count" -le 2 ]; then
+  wait_spin 15
+
+  echo "Restarting Corosync to ensure updated config is reloaded..."
+  systemctl restart corosync
+  sleep 2
+  echo "Setting expected nodes to 1..."
+  pvecm expected 1
+  sleep 2
+  echo "Attempting delete on ${NODE_NAME}, will run until completed, use CTRL+C to cancel..."
+  while ! pvecm delnode "${NODE_NAME}"; do
+    echo "pvecm delnode failed. Retrying in 5 seconds..."
+    sleep 5
+  done
 fi
 
-# 3) Clean SSH references on remaining cluster nodes
-ONLINE_NODES=$(pvecm nodes | awk '{print $3}')
+# 2) Clean SSH references on remaining cluster nodes
+ONLINE_NODES=$(pvecm nodes | awk '!/Name/ {print $3}')
 echo "Cleaning SSH references on other cluster nodes..."
 for host in ${ONLINE_NODES}; do
   # Skip if it's the removed node or blank
@@ -117,3 +140,10 @@ echo "Node \"${NODE_NAME}\" has been removed from the cluster."
 echo "All known SSH references on remaining cluster nodes have been cleaned."
 echo
 echo "You may now safely re-add a new server with the same name (\"${NODE_NAME}\") in the future."
+
+
+###############################################################################
+# Testing status
+###############################################################################
+# Tested single-node
+# Tested multi-node
