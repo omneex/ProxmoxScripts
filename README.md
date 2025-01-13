@@ -37,6 +37,12 @@ Or an even shorter single line call:
 bash <(curl -L pve.coela.sh)
 ```
 
+
+Short single line call with a minimal header:
+```bash
+bash <(curl -L pve.coela.sh) -nh
+```
+
 ![Single Line Online Command](.site/SingleLineCommand.png)
 
 ### Installation
