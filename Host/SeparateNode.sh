@@ -71,3 +71,8 @@ rm /var/lib/corosync/*
 
 echo "Node has been forcibly removed from the cluster."
 echo "Make sure no shared storage is still in use by multiple clusters."
+
+###############################################################################
+# Testing status
+###############################################################################
+# Tested single-node

@@ -2,8 +2,24 @@
 #
 # Utilities.sh
 #
-# A script containing reusable functions for Proxmox management and automation.
-# Designed to be sourced and used as a library in other scripts.
+# Provides reusable functions for Proxmox management and automation.
+# Typically, it is not run directly. Instead, you source this script from your own.
+#
+# Usage:
+#   source "Utilities.sh"
+#   # Then call any of the utility functions below, for example:
+#   check_root
+#   check_proxmox
+#   install_or_prompt "curl"
+#   ...
+#
+# Further Explanation:
+# - This library is designed for Proxmox version 8 by default.
+# - Each function includes its own usage block in the comments.
+# - Not all functions require root privileges, but your calling script might.
+# - If a package is not available in a default Proxmox 8 install, call install_or_prompt.
+# - You can call prompt_keep_installed_packages at the end of your script to offer
+#   removal of session-installed packages.
 #
 
 set -e
@@ -13,6 +29,7 @@ set -e
 ###############################################################################
 # Array to keep track of packages installed by install_or_prompt() in this session.
 SESSION_INSTALLED_PACKAGES=()
+SPINNER_PID=""
 
 ###############################################################################
 # 1. Misc Functions
@@ -49,8 +66,8 @@ check_proxmox() {
 # --- Install or Prompt Function --------------------------------------------
 # @function install_or_prompt
 # @description Checks if a specified command is available. If not, prompts
-# the user to install it via apt-get. Exits if the user declines.
-# Also keeps track of installed packages in SESSION_INSTALLED_PACKAGES.
+#   the user to install it via apt-get. Exits if the user declines.
+#   Also keeps track of installed packages in SESSION_INSTALLED_PACKAGES.
 # @usage
 #   install_or_prompt <command_name>
 # @param command_name The name of the command to check and install if missing.
@@ -64,7 +81,6 @@ install_or_prompt() {
         read -r -p "Would you like to install '$cmd' now? [y/N]: " response
         if [[ "$response" =~ ^[Yy]$ ]]; then
             apt-get install -y "$cmd"
-            # Keep track of what we've installed in this session
             SESSION_INSTALLED_PACKAGES+=("$cmd")
         else
             echo "Aborting script because '$cmd' is not installed."
@@ -76,14 +92,13 @@ install_or_prompt() {
 # --- Prompt to Keep or Remove Installed Packages ----------------------------
 # @function prompt_keep_installed_packages
 # @description Prompts the user whether to keep or remove all packages that
-# were installed in this session via install_or_prompt(). If the user chooses
-# "No", each package in SESSION_INSTALLED_PACKAGES is removed.
+#   were installed in this session via install_or_prompt(). If the user chooses
+#   "No", each package in SESSION_INSTALLED_PACKAGES is removed.
 # @usage
 #   prompt_keep_installed_packages
 # @return
 #   Removes packages if user says "No", otherwise does nothing.
 prompt_keep_installed_packages() {
-    # If no packages were installed this session, there's nothing to remove
     if [[ ${#SESSION_INSTALLED_PACKAGES[@]} -eq 0 ]]; then
         return
     fi
@@ -92,12 +107,10 @@ prompt_keep_installed_packages() {
     printf ' - %s\n' "${SESSION_INSTALLED_PACKAGES[@]}"
     read -r -p "Do you want to KEEP these packages? [Y/n]: " response
 
-    # Default is 'Yes' (keep them)
     if [[ "$response" =~ ^[Nn]$ ]]; then
         echo "Removing the packages installed in this session..."
         apt-get remove -y "${SESSION_INSTALLED_PACKAGES[@]}"
-        # Optionally remove them completely (configs, etc.) with apt-get purge:
-        # apt-get purge -y "${SESSION_INSTALLED_PACKAGES[@]}"
+        # Optional: apt-get purge -y "${SESSION_INSTALLED_PACKAGES[@]}"
         SESSION_INSTALLED_PACKAGES=()
         echo "Packages removed."
     else
@@ -105,10 +118,14 @@ prompt_keep_installed_packages() {
     fi
 }
 
+###############################################################################
+# 2. Cluster/Node Functions
+###############################################################################
+
 # --- Get Remote Node IPs ---------------------------------------------------
 # @function get_remote_node_ips
 # @description Gathers IPs for all cluster nodes (excluding local) from 'pvecm status'.
-# Outputs each IP on a new line, which can be captured into an array with readarray.
+#   Outputs each IP on a new line, which can be captured into an array with readarray.
 # @usage
 #   readarray -t REMOTE_NODES < <( get_remote_node_ips )
 # @return
@@ -127,14 +144,13 @@ get_remote_node_ips() {
 # --- Check Cluster Membership ----------------------------------------------
 # @function check_cluster_membership
 # @description Checks if the node is recognized as part of a cluster by examining
-# 'pvecm status'. If no cluster name is found, it exits with an error.
+#   'pvecm status'. If no cluster name is found, it exits with an error.
 # @usage
 #   check_cluster_membership
 # @return
 #   Exits 3 if the node is not in a cluster (according to pvecm).
 check_cluster_membership() {
     local cluster_name
-    # Extract the cluster name from the line beginning with "Name:"
     cluster_name=$(pvecm status 2>/dev/null | awk -F': ' '/^Name:/ {print $2}' | xargs)
 
     if [[ -z "$cluster_name" ]]; then
@@ -145,37 +161,20 @@ check_cluster_membership() {
     fi
 }
 
-# ---------------------------------------------------------------------------
+# --- Get Number of Cluster Nodes -------------------------------------------
 # @function get_number_of_cluster_nodes
-# @description
-#   Returns the total number of nodes in the cluster by counting lines matching
-#   a numeric ID from `pvecm nodes`.
+# @description Returns the total number of nodes in the cluster by counting
+#   lines matching a numeric ID from `pvecm nodes`.
 # @usage
 #   local num_nodes=$(get_number_of_cluster_nodes)
 # @return
 #   Prints the count of cluster nodes to stdout.
-# ---------------------------------------------------------------------------
 get_number_of_cluster_nodes() {
     echo "$(pvecm nodes | awk '/^[[:space:]]*[0-9]/ {count++} END {print count}')"
 }
 
-wait_spin() {
-    local -a seconds=()
-    spinner="/-\|"
-
-    for ((i = 0; i < seconds; i++)); do
-        # Pick the spinner character based on i
-        index=$((i % ${#spinner}))
-
-        # \r returns cursor to start of line; overwrite with next spinner character
-        printf "\r%s" "${spinner:index:1}"
-
-        sleep 1
-    done
-}
-
 ###############################################################################
-# 2. IP CONVERSION UTILITIES
+# 3. IP Conversion Utilities
 ###############################################################################
 
 # --- IP to Integer ---------------------------------------------------------
@@ -210,77 +209,56 @@ int_to_ip() {
     echo "$ip"
 }
 
-# Declare global associative arrays to store node mappings
+###############################################################################
+# 4. Node Mapping Functions
+###############################################################################
+
 declare -A NODEID_TO_IP=()
 declare -A NODEID_TO_NAME=()
 declare -A NAME_TO_IP=()
 declare -A IP_TO_NAME=()
-
-# Flag to track whether we have already built the maps
 MAPPINGS_INITIALIZED=0
 
-# ---------------------------------------------------------------------------
+# --- Initialize Node Mappings ----------------------------------------------
 # @function init_node_mappings
-# @description
-#   Parses `pvecm status` and `pvecm nodes` to build internal maps:
-#     NODEID_TO_IP[nodeid]   -> IP
-#     NODEID_TO_NAME[nodeid] -> Name
+# @description Parses `pvecm status` and `pvecm nodes` to build internal maps:
+#   NODEID_TO_IP[nodeid]   -> IP
+#   NODEID_TO_NAME[nodeid] -> Name
 #   Then creates:
-#     NAME_TO_IP[name]       -> IP
-#     IP_TO_NAME[ip]         -> name
-#   This function is called automatically by get_ip_from_name/get_name_from_ip
-#   if maps are not yet built.
-# ---------------------------------------------------------------------------
+#   NAME_TO_IP[name]       -> IP
+#   IP_TO_NAME[ip]         -> name
+# @usage
+#   init_node_mappings
+# @return
+#   Populates the associative arrays above with node info.
 init_node_mappings() {
-    # Clear arrays in case this function is rerun
     NODEID_TO_IP=()
     NODEID_TO_NAME=()
     NAME_TO_IP=()
     IP_TO_NAME=()
 
-    # 1) Build { nodeid_decimal => IP } from `pvecm status`
-    #    Example lines:
-    #    0x00000001          1 172.20.83.21
     while IFS= read -r line; do
-        # Each line has 3+ fields:
-        #   $1=0xHEX, $2=Votes, $3=IP (possibly with '(local)')
-        # We extract nodeid_hex and ip.
-        # Example: "0x00000001          1 172.20.83.21"
+        local nodeid_hex
+        local ip_part
         nodeid_hex=$(awk '{print $1}' <<<"$line")
         ip_part=$(awk '{print $3}' <<<"$line")
-
-        # Strip "(local)" from the IP if present
         ip_part="${ip_part//(local)/}"
-
-        # Convert hex nodeid to decimal (e.g., 0x00000001 -> 1)
-        nodeid_dec=$((16#${nodeid_hex#0x}))
-
-        # Store in associative array
+        local nodeid_dec=$((16#${nodeid_hex#0x}))
         NODEID_TO_IP["$nodeid_dec"]="$ip_part"
     done < <(pvecm status 2>/dev/null | awk '/^0x/{print}')
 
-    # 2) Build { nodeid_decimal => Name } from `pvecm nodes`
-    #    Example lines:
-    #    1          1 IHK01
     while IFS= read -r line; do
-        # Each line has 3+ fields:
-        #   $1=nodeid_decimal, $2=Votes, $3=Name (possibly with '(local)')
+        local nodeid_dec
+        local name_part
         nodeid_dec=$(awk '{print $1}' <<<"$line")
         name_part=$(awk '{print $3}' <<<"$line")
-
-        # Strip "(local)" from the name if present
         name_part="${name_part//(local)/}"
-
-        # Store in associative array
         NODEID_TO_NAME["$nodeid_dec"]="$name_part"
     done < <(pvecm nodes 2>/dev/null | awk '/^[[:space:]]*[0-9]/ {print}')
 
-    # 3) Combine them into NAME_TO_IP and IP_TO_NAME
     for nodeid in "${!NODEID_TO_NAME[@]}"; do
         local name="${NODEID_TO_NAME[$nodeid]}"
         local ip="${NODEID_TO_IP[$nodeid]}"
-
-        # Skip if either is empty (meaning we didn’t find a match in the other command)
         if [[ -n "$name" && -n "$ip" ]]; then
             NAME_TO_IP["$name"]="$ip"
             IP_TO_NAME["$ip"]="$name"
@@ -290,17 +268,15 @@ init_node_mappings() {
     MAPPINGS_INITIALIZED=1
 }
 
-# ---------------------------------------------------------------------------
+# --- Get IP from Node Name -------------------------------------------------
 # @function get_ip_from_name
-# @description
-#   Given a node’s name (e.g., "IHK01"), prints its link0 IP address to stdout.
-#   If not found, prints an error and exits 1.
+# @description Given a node’s name (e.g., "IHK01"), prints its link0 IP address.
+#   Exits if not found.
 # @usage
 #   get_ip_from_name "IHK03"
 # @param 1 The node name
 # @return
 #   Prints the IP to stdout or exits 1 if not found.
-# ---------------------------------------------------------------------------
 get_ip_from_name() {
     local node_name="$1"
     if [[ -z "$node_name" ]]; then
@@ -308,7 +284,6 @@ get_ip_from_name() {
         return 1
     fi
 
-    # Initialize mappings if not done yet
     if [[ "$MAPPINGS_INITIALIZED" -eq 0 ]]; then
         init_node_mappings
     fi
@@ -322,17 +297,15 @@ get_ip_from_name() {
     echo "$ip"
 }
 
-# ---------------------------------------------------------------------------
+# --- Get Name from Node IP -------------------------------------------------
 # @function get_name_from_ip
-# @description
-#   Given a node’s link0 IP (e.g., "172.20.83.23"), prints its node name (e.g., "IHK03").
-#   If not found, prints an error and exits 1.
+# @description Given a node’s link0 IP (e.g., "172.20.83.23"), prints its name.
+#   Exits if not found.
 # @usage
 #   get_name_from_ip "172.20.83.23"
 # @param 1 The node IP
 # @return
 #   Prints the node name to stdout or exits 1 if not found.
-# ---------------------------------------------------------------------------
 get_name_from_ip() {
     local node_ip="$1"
     if [[ -z "$node_ip" ]]; then
@@ -340,7 +313,6 @@ get_name_from_ip() {
         return 1
     fi
 
-    # Initialize mappings if not done yet
     if [[ "$MAPPINGS_INITIALIZED" -eq 0 ]]; then
         init_node_mappings
     fi
@@ -355,103 +327,219 @@ get_name_from_ip() {
 }
 
 ###############################################################################
-# 3. CONTAINER AND VM QUERIES
+# 5. Container and VM Queries
 ###############################################################################
 
 # --- Get All LXC Containers in Cluster --------------------------------------
 # @function get_cluster_lxc
 # @description Retrieves the VMIDs for all LXC containers across the entire cluster.
-# Outputs each LXC VMID on its own line, which can be captured into an array.
+#   Outputs each LXC VMID on its own line.
 # @usage
 #   readarray -t ALL_CLUSTER_LXC < <( get_cluster_lxc )
 # @return
 #   Prints each LXC VMID on a separate line.
 get_cluster_lxc() {
-    local -a container_ids=()
-    while IFS= read -r vmid; do
-        container_ids+=("$vmid")
-    done < <(pvesh get /cluster/resources --type lxc --output-format json 2>/dev/null |
-        awk -F'[:,"]' '/"vmid"/ {gsub(/ /,"",$3); print $3}')
-
-    for id in "${container_ids[@]}"; do
-        echo "$id"
-    done
+    install_or_prompt "jq"
+    pvesh get /cluster/resources --type vm --output-format json 2>/dev/null \
+        | jq -r '.[] | select(.type=="lxc") | .vmid'
 }
 
 # --- Get All LXC Containers on a Server ------------------------------------
 # @function get_server_lxc
 # @description Retrieves the VMIDs for all LXC containers on a specific server.
-# The server can be specified by hostname, IP address, or the word "local" (for this node).
-# Outputs each LXC VMID on its own line, which can be captured into an array.
+#   The server can be specified by hostname, IP address, or "local".
 # @usage
 #   readarray -t NODE_LXC < <( get_server_lxc "local" )
-#   readarray -t NODE_LXC < <( get_server_lxc "172.20.83.21" )
 # @param 1 Hostname/IP/"local" specifying the server.
 # @return
-#   Prints each LXC VMID on a separate line.
+#   Prints each LXC VMID on its own line.
 get_server_lxc() {
-    local server="$1"
+    local nodeSpec="$1"
+    local nodeName
 
-    if [[ "$server" == "local" ]]; then
-        server="$(hostname)"
+    if [[ "$nodeSpec" == "local" ]]; then
+        nodeName="$(hostname -s)"
+    elif [[ "$nodeSpec" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        nodeName="$(get_name_from_ip "$nodeSpec")"
+    else
+        nodeName="$nodeSpec"
     fi
 
-    local -a container_ids=()
-    while IFS= read -r vmid; do
-        container_ids+=("$vmid")
-    done < <(pvesh get "/nodes/${server}/lxc" --output-format json 2>/dev/null |
-        awk -F'[:,"]' '/"vmid"/ {gsub(/ /,"",$3); print $3}')
+    if [[ -z "$nodeName" ]]; then
+        echo "Error: Unable to determine node name for '$nodeSpec'." >&2
+        return 1
+    fi
 
-    for id in "${container_ids[@]}"; do
-        echo "$id"
-    done
+    pvesh get /cluster/resources --type vm --output-format json 2>/dev/null \
+        | jq -r --arg NODENAME "$nodeName" \
+            '.[] | select(.type=="lxc" and .node==$NODENAME) | .vmid'
 }
 
 # --- Get All VMs in Cluster ------------------------------------------------
 # @function get_cluster_vms
 # @description Retrieves the VMIDs for all VMs (QEMU) across the entire cluster.
-# Outputs each VM ID on its own line, which can be captured into an array.
+#   Outputs each VM ID on its own line.
 # @usage
 #   readarray -t ALL_CLUSTER_VMS < <( get_cluster_vms )
 # @return
 #   Prints each QEMU VMID on a separate line.
 get_cluster_vms() {
-    local -a vm_ids=()
-    while IFS= read -r vmid; do
-        vm_ids+=("$vmid")
-    done < <(pvesh get /cluster/resources --type vm --output-format json 2>/dev/null |
-        awk -F'[:,"]' '/"vmid"/ {gsub(/ /,"",$3); print $3}')
-
-    for id in "${vm_ids[@]}"; do
-        echo "$id"
-    done
+    install_or_prompt "jq"
+    pvesh get /cluster/resources --type vm --output-format json 2>/dev/null \
+        | jq -r '.[] | select(.type=="qemu") | .vmid'
 }
 
 # --- Get All VMs on a Server -----------------------------------------------
 # @function get_server_vms
 # @description Retrieves the VMIDs for all VMs (QEMU) on a specific server.
-# The server can be specified by hostname, IP address, or the word "local" (for this node).
-# Outputs each VM ID on its own line, which can be captured into an array.
+#   The server can be specified by hostname, IP address, or "local".
 # @usage
 #   readarray -t NODE_VMS < <( get_server_vms "local" )
-#   readarray -t NODE_VMS < <( get_server_vms "node1.mydomain.local" )
 # @param 1 Hostname/IP/"local" specifying the server.
 # @return
-#   Prints each QEMU VMID on a separate line.
+#   Prints each QEMU VMID on its own line.
 get_server_vms() {
-    local server="$1"
+    local nodeSpec="$1"
+    local nodeName
 
-    if [[ "$server" == "local" ]]; then
-        server="$(hostname)"
+    if [[ "$nodeSpec" == "local" ]]; then
+        nodeName="$(hostname -s)"
+    elif [[ "$nodeSpec" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        nodeName="$(get_name_from_ip "$nodeSpec")"
+    else
+        nodeName="$nodeSpec"
     fi
 
-    local -a vm_ids=()
-    while IFS= read -r vmid; do
-        vm_ids+=("$vmid")
-    done < <(pvesh get "/nodes/${server}/qemu" --output-format json 2>/dev/null |
-        awk -F'[:,"]' '/"vmid"/ {gsub(/ /,"",$3); print $3}')
+    if [[ -z "$nodeName" ]]; then
+        echo "Error: Unable to determine node name for '$nodeSpec'." >&2
+        return 1
+    fi
 
-    for id in "${vm_ids[@]}"; do
-        echo "$id"
-    done
+    pvesh get /cluster/resources --type vm --output-format json 2>/dev/null \
+        | jq -r --arg NODENAME "$nodeName" \
+            '.[] | select(.type=="qemu" and .node==$NODENAME) | .vmid'
 }
+
+###############################################################################
+# 6. Color Definitions and Spinner
+###############################################################################
+RESET="\033[0m"
+RED="\033[31m"
+GREEN="\033[32m"
+YELLOW="\033[33m"
+BOLD="\033[1m"
+
+# 24-bit rainbow colors for an animated spinner
+RAINBOW_COLORS=(
+  "255;0;0"
+  "255;127;0"
+  "255;255;0"
+  "0;255;0"
+  "0;255;255"
+  "0;127;255"
+  "0;0;255"
+  "127;0;255"
+  "255;0;255"
+  "255;0;127"
+)
+
+###############################################################################
+# RAINBOW SPINNER (INFINITE LOOP)
+###############################################################################
+# @function spin
+# @description Runs an infinite spinner with rainbow color cycling in the background.
+# @usage
+#   spin &
+#   SPINNER_PID=$!
+spin() {
+  local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+  local spin_i=0
+  local color_i=0
+  local interval=0.025
+
+  printf "\e[?25l"  # hide cursor
+
+  while true; do
+    local rgb="${RAINBOW_COLORS[color_i]}"
+    printf "\r\033[38;2;${rgb}m%s\033[0m " "${frames[spin_i]}"
+    spin_i=$(( (spin_i + 1) % ${#frames[@]} ))
+    color_i=$(( (color_i + 1) % ${#RAINBOW_COLORS[@]} ))
+    sleep "$interval"
+  done
+}
+
+###############################################################################
+# STOPPING THE SPINNER
+###############################################################################
+# @function stop_spin
+# @description Kills the spinner background process, if any, and restores the cursor.
+# @usage
+#   stop_spin
+stop_spin() {
+  if [[ -n "$SPINNER_PID" ]] && ps -p "$SPINNER_PID" &>/dev/null; then
+    kill "$SPINNER_PID" &>/dev/null
+    wait "$SPINNER_PID" 2>/dev/null || true
+    SPINNER_PID=""
+  fi
+  printf "\e[?25h"  # show cursor
+}
+
+###############################################################################
+# INFO MESSAGE + START SPINNER
+###############################################################################
+# @function info
+# @description Prints a message in bold yellow, then starts the rainbow spinner.
+# @usage
+#   info "Doing something..."
+info() {
+  local msg="$1"
+  echo -ne "  ${YELLOW}${BOLD}${msg}${RESET} "
+  spin &
+  SPINNER_PID=$!
+}
+
+###############################################################################
+# SUCCESS MESSAGE (Stops Spinner)
+###############################################################################
+# @function ok
+# @description Kills spinner, prints success message in green.
+# @usage
+#   ok "Everything done!"
+ok() {
+  stop_spin
+  echo -ne "\r\033[K"   # Clear the line first
+  local msg="$1"
+  echo -e "${GREEN}${BOLD}${msg}${RESET}"
+}
+
+###############################################################################
+# ERROR MESSAGE (Stops Spinner)
+###############################################################################
+# @function err
+# @description Kills spinner, prints error message in red.
+# @usage
+#   err "Something went wrong!"
+err() {
+  stop_spin
+  echo -ne "\r\033[K"   # Clear the line first
+  local msg="$1"
+  echo -e "${RED}${BOLD}${msg}${RESET}"
+}
+
+###############################################################################
+# ERROR HANDLER
+###############################################################################
+# @function handle_err
+# @description Error handler to show line number, exit code, and failing command.
+# @usage
+#   trap 'handle_err $LINENO "$BASH_COMMAND"' ERR
+handle_err() {
+  local line_number="$1"
+  local command="$2"
+  local exit_code="$?"
+  stop_spin
+  echo -ne "\r\033[K"   # Clear the line first
+  echo -e "${RED}[ERROR]${RESET} line ${RED}${line_number}${RESET}, exit code ${RED}${exit_code}${RESET} while executing: ${YELLOW}${command}${RESET}"
+}
+
+trap 'handle_err $LINENO "$BASH_COMMAND"' ERR

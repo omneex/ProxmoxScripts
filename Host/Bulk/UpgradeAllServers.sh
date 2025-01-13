@@ -44,18 +44,24 @@ echo "Updating all servers in the Proxmox cluster..."
 
 for nodeIp in "${ALL_NODE_IPS[@]}"; do
   echo "------------------------------------------------"
-  echo "Updating node at IP: \"${nodeIp}\""
+  info "Updating node at IP: \"${nodeIp}\""
 
   if [[ "${nodeIp}" == "${LOCAL_NODE_IP}" ]]; then
     apt-get update && apt-get -y upgrade
-    echo "Local node update completed."
+    ok "Local node update completed."
   else
     if ssh "root@${nodeIp}" "apt-get update && apt-get -y upgrade"; then
-      echo "Remote node \"${nodeIp}\" update completed."
+      ok "Remote node \"${nodeIp}\" update completed."
     else
-      echo "Failed to update node \"${nodeIp}\"."
+      err "Failed to update node \"${nodeIp}\"."
     fi
   fi
 done
 
 echo "All servers have been successfully updated."
+
+###############################################################################
+# Testing status
+###############################################################################
+# Tested single-node
+# Tested multi-node

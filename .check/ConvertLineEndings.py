@@ -15,6 +15,8 @@ def convert_line_endings_to_unix(directory):
         if ".github" in dirs:
             dirs.remove(".git")
             dirs.remove(".github")
+            dirs.remove(".site")
+            dirs.remove(".check")
 
         for filename in files:
             # Skip .gitattributes files

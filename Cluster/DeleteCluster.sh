@@ -61,3 +61,9 @@ systemctl disable corosync 2>/dev/null || true
 echo "=== Done ==="
 echo "This node is no longer part of any Proxmox cluster."
 echo "You can verify by running 'pvecm status' (it should show no cluster)."
+
+###############################################################################
+# Testing status
+###############################################################################
+# Tested single-node
+# Tested multi-node

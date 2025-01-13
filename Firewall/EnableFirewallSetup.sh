@@ -34,8 +34,7 @@ VXLAN_PORT="4789"          # Default VXLAN UDP port
 ipset_contains_cidr() {
   # Check if a given CIDR is already in the proxmox-nodes IP set
   local cidr="$1"
-  local existingCidrs
-  existingCidrs=$(
+  local existingCidrs=$(
     pvesh get /cluster/firewall/ipset/proxmox-nodes --output-format json 2>/dev/null \
       | jq -r '.[].cidr'
   )
@@ -49,8 +48,7 @@ ipset_contains_cidr() {
 rule_exists_by_comment() {
   # Check if a firewall rule with a particular comment already exists
   local comment="$1"
-  local existingComments
-  existingComments=$(
+  local existingComments=$(
     pvesh get /cluster/firewall/rules --output-format json 2>/dev/null \
       | jq -r '.[].comment // empty'
   )

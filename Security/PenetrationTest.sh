@@ -77,3 +77,9 @@ for host in "${TARGETS[@]}"; do
 done
 
 prompt_keep_installed_packages
+
+###############################################################################
+# Testing status
+###############################################################################
+# Tested single-node
+# Tested multi-node

@@ -195,3 +195,8 @@ echo "System error check completed!"
 
 # Prompt to remove installed packages if any were installed during this session
 prompt_keep_installed_packages
+
+###############################################################################
+# Testing status
+###############################################################################
+# Tested single-node

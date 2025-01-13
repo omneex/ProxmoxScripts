@@ -32,7 +32,7 @@ if [[ -z "$1" ]]; then
   exit 1
 fi
 
-local targetNodeName="$1"
+targetNodeName="$1"
 
 # 2. Basic checks
 check_root
@@ -46,7 +46,7 @@ echo "=== Disabling HA on node: \"$targetNodeName\" ==="
 
 # 4. Convert node name to IP for SSH calls
 echo "=== Resolving IP address for node \"$targetNodeName\" ==="
-local nodeIp
+declare nodeIp
 if ! nodeIp="$(get_ip_from_name "$targetNodeName")"; then
   echo "Error: Could not resolve node name \"$targetNodeName\" to an IP."
   exit 1
@@ -56,7 +56,7 @@ echo
 
 # 5. Identify HA resources referencing this node by name
 echo "=== Checking for HA resources on node \"$targetNodeName\"... ==="
-local haResources
+
 haResources="$(pvesh get /cluster/ha/resources --output-format json \
               | jq -r '.[] | select(.statePath | contains("'"$targetNodeName"'")) | .sid')"
 
@@ -68,7 +68,7 @@ else
   echo
 
   # Remove these HA resources
-  local res
+  declare res
   for res in $haResources; do
     echo "Removing HA resource \"$res\" ..."
     if pvesh delete "/cluster/ha/resources/${res}"; then

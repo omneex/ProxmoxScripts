@@ -146,11 +146,11 @@ if [[ "$SAVE_CSV" =~ ^[Yy]$ ]]; then
 
   for jsonFile in "$READ_JSON" "$WRITE_JSON"; do
     if $JQ_AVAILABLE; then
-      local jobName
-      local iops
-      local bw
-      local lat50
-      local lat99
+      declare jobName
+      declare iops
+      declare bw
+      declare lat50
+      declare lat99
       jobName=$(jq -r '.jobs[0].jobname' "$jsonFile")
       iops=$(jq -r '.jobs[0].read.iops + .jobs[0].write.iops' "$jsonFile")
       bw=$(jq -r '((.jobs[0].read.bw_bytes + .jobs[0].write.bw_bytes)/1048576) | floor' "$jsonFile")

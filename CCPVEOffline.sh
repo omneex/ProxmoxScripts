@@ -12,7 +12,7 @@
 #   4) ./CCPVEOffline.sh
 #
 # Author: Coela Can't! (coelacant1)
-# Repo: https://github.com/coelacant1/ProxmoxScripts (for reference)
+# Repo: https://github.com/coelacant1/ProxmoxScripts
 #
 
 set -e
@@ -21,20 +21,21 @@ set -e
 # CONFIG
 ###############################################################################
 
-BASE_DIR="$(pwd)"          # We assume the script is run from the unzipped directory
-DISPLAY_PREFIX="cc_pve"    # How we display the "root" in the UI
-HELP_FLAG="--help"         # If your scripts support a help flag, we pass this
-LAST_SCRIPT=""             # The last script run
-LAST_OUTPUT=""             # Truncated output of the last script
+BASE_DIR="$(pwd)"       # We assume the script is run from the unzipped directory
+DISPLAY_PREFIX="cc_pve" # How we display the "root" in the UI
+HELP_FLAG="--help"      # If your scripts support a help flag, we pass this
+LAST_SCRIPT=""          # The last script run
+LAST_OUTPUT=""          # Truncated output of the last script
 
 ###############################################################################
-# IMPORT UTILITY FUNCTIONS FOR SCRIPTS
+# IMPORT UTILITY FUNCTIONS FOR SCRIPTS AND COLOR GRADIENT LIBRARY
 ###############################################################################
 
 source "./Utilities/Utilities.sh"
+source "./Utilities/Colors.sh"
 
 ###############################################################################
-# OPTIONAL ASCII ART HEADER
+# ASCII ART HEADER
 ###############################################################################
 
 # Original (large) ASCII art as a single multi-line string
@@ -82,18 +83,17 @@ EOF
 SMALL_LENGTH=44
 
 show_ascii_art() {
-  # Detect terminal width
-  local width
-  width=$(tput cols)
+    local width
+    width=$(tput cols)
 
-  # Compare max line length to terminal width
-  if (( LARGE_LENGTH <= width )); then
-    # Terminal is wide enough for large art
-    echo "$LARGE_ASCII"
-  else
-    # Too narrow, print the smaller art
-    echo "$SMALL_ASCII"
-  fi
+    # We'll pick a gradient from purple (128,0,128) to cyan (0,255,255)
+    if ((LARGE_LENGTH <= width)); then
+        gradient_print "$LARGE_ASCII" 128 0 128 0 255 255 "█"
+    else
+        gradient_print "$SMALL_ASCII" 128 0 128 0 255 255
+    fi
+
+    echo
 }
 
 ###############################################################################
@@ -109,7 +109,7 @@ show_top_comments() {
     clear
     show_ascii_art
 
-    echo "=== Top Comments for: $(display_path "$script_path") ==="
+    line_rgb "=== Top Comments for: $(display_path "$script_path") ===" 200 200 0
     echo
 
     local printing=false
@@ -121,7 +121,7 @@ show_top_comments() {
             continue
         fi
         if [[ "$line" =~ ^# ]]; then
-            echo "$line"
+            line_rgb "$line" 0 200 0
             printing=true
         else
             if [ "$printing" = true ]; then
@@ -131,42 +131,40 @@ show_top_comments() {
     done <"$script_path"
 
     echo
-    echo "Press Enter to continue."
+    line_rgb "Press Enter to continue." 0 255 255
     read -r
 }
 
 # Attempt to find a line like '# ./something.sh ...' in the top comments
+
 extract_dot_slash_help_line() {
     local script_path="$1"
     local found_line=""
-
     while IFS= read -r line; do
-        # Stop if we've hit a non-# line
         if [[ ! "$line" =~ ^# ]]; then
             break
         fi
-        local stripped="${line#\#}" 
+        local stripped="${line#\#}"
         stripped="${stripped#"${stripped%%[![:space:]]*}"}"
         if [[ "$stripped" =~ ^\./ ]]; then
             found_line="$stripped"
             break
         fi
     done <"$script_path"
-
     echo "$found_line"
 }
 
 # If the script is executable with a '--help' usage, we can try to show that.
 show_script_usage() {
     local script_path="$1"
-    echo "=== Showing usage for: $(display_path "$script_path") ==="
+    line_rgb "=== Showing usage for: $(display_path "$script_path") ===" 2000 200 0
     if [ -x "$script_path" ]; then
         "$script_path" "$HELP_FLAG" 2>&1 || true
     else
         bash "$script_path" "$HELP_FLAG" 2>&1 || true
     fi
     echo
-    echo "Press Enter to continue."
+    line_rgb "Press Enter to continue." 0 255 255
     read -r
 }
 
@@ -174,7 +172,7 @@ show_script_usage() {
 display_path() {
     local fullpath="$1"
     local relative="${fullpath#$BASE_DIR}"
-    relative="${relative#/}"   # remove leading slash if present
+    relative="${relative#/}" # remove leading slash if present
 
     if [ -z "$relative" ]; then
         echo "$DISPLAY_PREFIX"
@@ -186,27 +184,23 @@ display_path() {
 ###############################################################################
 # SCRIPT RUNNER
 ###############################################################################
-
 run_script() {
     local script_path="$1"
-    clear
-    show_ascii_art
-
     local ds_line
     ds_line=$(extract_dot_slash_help_line "$script_path")
 
     clear
     show_ascii_art
     if [ -n "$ds_line" ]; then
-        echo "Example usage (from script comments):"
+        line_rgb "Example usage (from script comments):" 0 200 0
         echo "  $ds_line"
         echo
     else
-        show_top_comments "$script_path"
+        line_rgb show_top_comments "$script_path" 0 200 0
         echo
     fi
 
-    echo "=== Enter parameters for $(display_path "$script_path") (type 'c' to cancel or leave empty to run no-args):"
+    line_rgb "=== Enter parameters for $(display_path "$script_path") (type 'c' to cancel or leave empty to run no-args):" 200 200 0
     read -r param_line
 
     if [ "$param_line" = "c" ]; then
@@ -214,11 +208,9 @@ run_script() {
     fi
 
     echo
-    echo "=== Running: $(display_path "$script_path") $param_line ==="
+    line_rgb "=== Running: $(display_path "$script_path") $param_line ===" 200 200 0
 
     IFS=' ' read -r -a param_array <<<"$param_line"
-    
-    # Remove any trailing \r
     param_line=$(echo "$param_line" | tr -d '\r')
 
     mkdir -p .log
@@ -226,66 +218,59 @@ run_script() {
 
     export UTILITIES="$(realpath ./Utilities/Utilities.sh)"
 
-    # Build an escaped command string for script -c
     escaped_args=()
     for arg in "${param_array[@]}"; do
-        escaped_args+=( "$(printf '%q' "$arg")" )
+        escaped_args+=("$(printf '%q' "$arg")")
     done
-
-    # Now join them in one string
     cmd_string="$(printf '%s ' "${escaped_args[@]}")"
     cmd_string="${script_path} ${cmd_string}"
 
     script -q -c "$cmd_string" .log/out.log
-    
-    # Capture script output in an array, to truncate if needed
+
     declare -a output_lines
     mapfile -t output_lines < <(sed '/^Script started on /d; /^Script done on /d' .log/out.log)
     rm .log/out.log
 
     LAST_SCRIPT="$(display_path "$script_path")"
 
-    # Build truncated output: first 3 lines, then '...', then last 9 lines
     local total_lines="${#output_lines[@]}"
-    if (( total_lines <= 12 )); then
-        # No need to truncate
+    if ((total_lines <= 12)); then
         LAST_OUTPUT="$(printf '%s\n' "${output_lines[@]}")"
     else
-        # Show first 3 lines, then '...', then last 9 lines
         local truncated_output=""
-        for (( i=0; i<3; i++ )); do
+        for ((i = 0; i < 3; i++)); do
             truncated_output+="${output_lines[$i]}"
             truncated_output+=$'\n'
         done
         truncated_output+="...\n"
-        local start_index=$(( total_lines - 9 ))
-        for (( i=start_index; i<total_lines; i++ )); do
+        local start_index=$((total_lines - 9))
+        for ((i = start_index; i < total_lines; i++)); do
             truncated_output+="${output_lines[$i]}"
             truncated_output+=$'\n'
         done
         LAST_OUTPUT="$truncated_output"
     fi
 
-    echo "Press Enter to continue."
+    echo
+    line_rgb "Press Enter to continue." 0 255 0
     read -r
 }
 
 ###############################################################################
 # DIRECTORY NAVIGATOR
 ###############################################################################
-
 navigate() {
     local current_dir="$1"
 
     while true; do
         clear
         show_ascii_art
-        echo "CURRENT DIRECTORY: $(display_path "$current_dir")"
+        echo -n "CURRENT DIRECTORY: "
+        line_rgb "./$(display_path "$current_dir")" 0 255 0
         echo
         echo "Folders and scripts:"
-        echo "--------------------"
+        echo "----------------------------------------"
 
-        # Gather subdirectories and .sh scripts
         mapfile -t dirs < <(find "$current_dir" -mindepth 1 -maxdepth 1 -type d ! -name ".*" | sort)
         mapfile -t scripts < <(find "$current_dir" -mindepth 1 -maxdepth 1 -type f -name "*.sh" ! -name ".*" | sort)
 
@@ -294,9 +279,8 @@ navigate() {
 
         # List directories
         for d in "${dirs[@]}"; do
-            local dname
-            dname="$(basename "$d")"
-            echo "$index) $dname/"
+            local dname="$(basename "$d")"
+            line_rgb "$index) $dname/" 0 200 200
             menu_map[$index]="$d"
             ((index++))
         done
@@ -305,36 +289,37 @@ navigate() {
         for s in "${scripts[@]}"; do
             local sname
             sname="$(basename "$s")"
-            echo "$index) $sname"
+            line_rgb "$index) $sname" 100 200 100
             menu_map[$index]="$s"
             ((index++))
         done
 
         echo
-        echo "--------------------"
+        echo "----------------------------------------"
         echo
         echo "Type 'h<number>' to show top comments for a script."
         echo "Type 'b' to go up one directory."
         echo "Type 'e' to exit."
         echo
-        echo "--------------------"
+        echo "----------------------------------------"
 
-        # Show the last script's truncated output
         if [ -n "$LAST_OUTPUT" ]; then
             echo "Last Script Called: $LAST_SCRIPT"
             echo "Output (truncated if large):"
             echo "$LAST_OUTPUT"
             echo
-            echo "--------------------"
+            echo "----------------------------------------"
         fi
 
+        
         echo -n "Enter choice: "
-        read -r choice
+
+        IFS= read -r choice
 
         # 'b' => go up
         if [[ "$choice" == "b" ]]; then
             if [ "$current_dir" = "$BASE_DIR" ]; then
-                echo "Exiting..."
+                line_rgb "Exiting..." 255 0 0
                 exit 0
             else
                 echo "Going up..."
@@ -344,6 +329,7 @@ navigate() {
 
         # 'e' => exit
         if [[ "$choice" == "e" ]]; then
+            line_rgb "Exiting..." 255 0 0
             exit 0
         fi
 
@@ -391,11 +377,6 @@ navigate() {
 # MAIN
 ###############################################################################
 
-# Begin with updating the repositories
-apt update | true
-
-# Make the script folder executable
+apt update || true
 ./MakeScriptsExecutable.sh
-
-# Start navigation from the current directory
 navigate "$BASE_DIR"

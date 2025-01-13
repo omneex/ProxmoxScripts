@@ -20,9 +20,6 @@ source "$UTILITIES"
 check_root
 check_proxmox
 
-# 'rbd' might not be installed by default if Ceph is not configured. Prompt to install if missing.
-install_or_prompt "rbd"
-
 ###############################################################################
 # Validate and parse inputs
 ###############################################################################
@@ -60,5 +57,3 @@ for vmIndex in $(seq "$START_VM_INDEX" "$END_VM_INDEX"); do
   diskName="vm-${vmIndex}-disk-${DISK_NUMBER}"
   delete_disk "$POOL_NAME" "$diskName"
 done
-
-prompt_keep_installed_packages

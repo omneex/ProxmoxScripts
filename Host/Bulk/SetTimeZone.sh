@@ -40,20 +40,20 @@ readarray -t REMOTE_NODES < <( get_remote_node_ips )
 
 # Set timezone on each remote node
 for nodeIp in "${REMOTE_NODES[@]}"; do
-    echo "Setting timezone to \"${TIMEZONE}\" on node: \"${nodeIp}\""
+    info "Setting timezone to \"${TIMEZONE}\" on node: \"${nodeIp}\""
     if ssh "root@${nodeIp}" "timedatectl set-timezone \"${TIMEZONE}\""; then
-        echo " - Timezone set successfully on node: \"${nodeIp}\""
+        ok " - Timezone set successfully on node: \"${nodeIp}\""
     else
-        echo " - Failed to set timezone on node: \"${nodeIp}\""
+        err " - Failed to set timezone on node: \"${nodeIp}\""
     fi
 done
 
 # Finally, set the timezone on the local node
-echo "Setting timezone to \"${TIMEZONE}\" on local node..."
+info "Setting timezone to \"${TIMEZONE}\" on local node..."
 if timedatectl set-timezone "${TIMEZONE}"; then
-    echo " - Timezone set successfully on local node"
+    ok " - Timezone set successfully on local node"
 else
-    echo " - Failed to set timezone on local node"
+    err " - Failed to set timezone on local node"
 fi
 
 echo "Timezone setup completed for all nodes!"

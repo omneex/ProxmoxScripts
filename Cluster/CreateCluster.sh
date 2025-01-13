@@ -55,3 +55,9 @@ echo "Cluster \"${CLUSTER_NAME}\" created with link0 address set to \"${MON_IP}\
 echo "To verify status:  pvecm status"
 echo "To join another node to this cluster (from that node):"
 echo "  pvecm add \"${MON_IP}\""
+
+###############################################################################
+# Testing status
+###############################################################################
+# Tested single-node
+# Tested multi-node
