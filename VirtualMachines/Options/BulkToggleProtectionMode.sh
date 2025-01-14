@@ -42,7 +42,7 @@ for (( VMID=START_VM_ID; VMID<=END_VM_ID; VMID++ )); do
         echo "Updating protection mode for VM ID: $VMID"
 
         # Set the protection mode
-        qm set $VMID --protected $PROTECTION_SETTING
+        qm set $VMID --protection $PROTECTION_SETTING
         echo " - Protection mode set to '$ACTION' for VM ID: $VMID."
     else
         echo "VM ID: $VMID does not exist. Skipping..."
