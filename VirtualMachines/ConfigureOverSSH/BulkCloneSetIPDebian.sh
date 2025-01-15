@@ -2,48 +2,57 @@
 #
 # BulkCloneSetIPDebian.sh
 #
-# Clones a Debian-based VM multiple times, updates each clone's IP address
-# (including the subnet mask in CIDR notation), sets a new default gateway,
-# and restarts its network interface. It assumes:
-#   1) The template VM is accessible via SSH at the provided template IP (no CIDR).
-#   2) /etc/network/interfaces on the template VM includes a line with
-#      "address <templateIp>/NN" that can be updated via sed.
-#   3) Any existing 'gateway' lines in /etc/network/interfaces will be removed
-#      and replaced by the new gateway you specify.
+# Clones a Debian-based VM multiple times, updates each clone's IP/network,
+# sets a default gateway, and restarts networking. Uses SSH with username/password.
+# Minimal comments, name prefix added for the cloned VMs.
 #
 # Usage:
-#   ./BulkCloneSetIPDebian.sh <templateIp> <startIp/CIDR> <newGateway> <count> <templateId> <baseVmId>
-#
-# Arguments:
-#   templateIp   : The template VM's IP address (e.g. 192.168.1.50).
-#   startIpCIDR  : The first clone's IP in CIDR format (e.g. 192.168.1.10/24).
-#   newGateway   : The default gateway for all new clones (e.g. 192.168.1.1).
-#   count        : Number of clones to create.
-#   templateId   : The template VM ID to clone from.
-#   baseVmId     : The first new VM ID to assign; subsequent clones increment this.
+#   ./BulkCloneSetIPDebian.sh <templateIp> <startIpCIDR> <newGateway> <count> <templateId> <baseVmId> <sshUsername> <sshPassword> <vmNamePrefix>
 #
 # Example:
-#   # Clones VM ID 9000 five times, starting at VM ID 9010.
-#   # The template is at 192.168.1.50, the first cloned IP is 192.168.1.10/24,
-#   # the gateway is set to 192.168.1.1, and each subsequent clone increments
-#   # the final octet by 1.
-#   ./BulkCloneSetIPDebian.sh 192.168.1.50 192.168.1.10/24 192.168.1.1 5 9000 9010
-#
-# Another Example:
-#   ./BulkCloneSetIPDebian.sh 192.168.10.50 192.168.10.100/24 192.168.10.1 3 800 810
+#   # Clones VM ID 100 five times, starting IP at 172.20.83.100 with mask /24,
+#   # gateway 172.20.83.1, base VM ID 200, SSH login root:pass123, prefix "CLOUD-"
+#   ./BulkCloneSetIPDebian.sh 172.20.83.22 172.20.83.100/24 172.20.83.1 5 100 200 root pass123 CLOUD-
 #
 
 source "$UTILITIES"
 
 ###############################################################################
-# Check prerequisites and parse arguments
+# Function Definitions
+###############################################################################
+function wait_for_ssh {
+  local host="$1"
+  local maxAttempts=20
+  local delay=3
+
+  for attempt in $(seq 1 "$maxAttempts"); do
+    if sshpass -p "$sshPassword" ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no \
+       "$sshUsername@$host" exit 2>/dev/null; then
+      echo "SSH is up on \"$host\""
+      return
+    fi
+    echo "Attempt $attempt/$maxAttempts: SSH not ready on \"$host\", waiting $delay s..."
+    sleep "$delay"
+  done
+
+  echo "Error: Could not connect to SSH on \"$host\" after $maxAttempts attempts."
+  exit 1
+}
+
+###############################################################################
+# Environment Checks
 ###############################################################################
 check_root
 check_proxmox
+install_or_prompt "sshpass"
+prompt_keep_installed_packages
 
-if [ $# -lt 6 ]; then
+###############################################################################
+# Argument Parsing
+###############################################################################
+if [ "$#" -lt 9 ]; then
   echo "Error: Missing arguments."
-  echo "Usage: $0 <templateIp> <startIpCIDR> <newGateway> <count> <templateId> <baseVmId>"
+  echo "Usage: $0 <templateIp> <startIpCIDR> <newGateway> <count> <templateId> <baseVmId> <sshUsername> <sshPassword> <vmNamePrefix>"
   exit 1
 fi
 
@@ -53,38 +62,44 @@ newGateway="$3"
 instanceCount="$4"
 templateId="$5"
 baseVmId="$6"
+sshUsername="$7"
+sshPassword="$8"
+vmNamePrefix="$9"
 
-# Split the starting IP and mask (e.g., 192.168.1.10/24 -> 192.168.1.10 and 24)
-IFS='/' read -r startIpAddrOnly startMask <<< "$startIpCidr"
-
-# Convert the starting IP to an integer for incrementing
-ipInt="$( ip_to_int "$startIpAddrOnly" )"
+IFS='/' read -r startIpAddrOnly startMask <<<"$startIpCidr"
+ipInt="$(ip_to_int "$startIpAddrOnly")"
 
 ###############################################################################
-# Main logic
+# Main Logic
 ###############################################################################
-for (( i=0; i<instanceCount; i++ )); do
-  currentVmId=$(( baseVmId + i ))
-  currentIp="$( int_to_ip "$ipInt" )"
+for ((i=0; i<instanceCount; i++)); do
+  currentVmId=$((baseVmId + i))
+  currentIp="$(int_to_ip "$ipInt")"
   currentIpCidr="$currentIp/$startMask"
 
   echo "Cloning VM ID \"$templateId\" to new VM ID \"$currentVmId\" with IP \"$currentIpCidr\"..."
-  qm clone "$templateId" "$currentVmId" --name "cloned-$currentVmId"
+  qm clone "$templateId" "$currentVmId" --name "${vmNamePrefix}${currentVmId}"
   qm start "$currentVmId"
 
-  echo "Configuring VM ID \"$currentVmId\" to use IP \"$currentIpCidr\" and gateway \"$newGateway\"..."
-  # Over SSH to the template VM:
-  #   1) Remove existing 'gateway' lines
-  #   2) Replace the template IP (and any mask) with the new IP/mask
-  #   3) Insert the new gateway line after the 'address' line
-  #   4) Restart networking
-  ssh "root@$templateIpAddr" "
-    sed -i '/\\bgateway\\b/d' /etc/network/interfaces
-    sed -i 's|$templateIpAddr/[0-9]\\+|$currentIpCidr|g' /etc/network/interfaces
-    sed -i '/address $currentIpCidr/a gateway $newGateway' /etc/network/interfaces
-    systemctl restart networking
-  "
+  wait_for_ssh "$templateIpAddr"
 
-  # Increment IP by 1 for the next clone
-  ipInt=$(( ipInt + 1 ))
+  sshpass -p "$sshPassword" ssh -o StrictHostKeyChecking=no "$sshUsername@$templateIpAddr" bash -s <<EOF
+sed -i '/\bgateway\b/d' /etc/network/interfaces
+sed -i "s#${templateIpAddr}/[0-9]\\+#${currentIpCidr}#g" /etc/network/interfaces
+sed -i "\#address ${currentIpCidr}#a gateway ${newGateway}" /etc/network/interfaces
+TAB="\$(printf '\\t')"
+sed -i "s|^[[:space:]]*gateway\\(.*\\)|\${TAB}gateway\\1|" /etc/network/interfaces
+EOF
+
+  sshpass -p "$sshPassword" ssh -o StrictHostKeyChecking=no "$sshUsername@$templateIpAddr" \
+    "nohup sh -c 'sleep 2; systemctl restart networking' >/dev/null 2>&1 &"
+
+  wait_for_ssh "$currentIp"
+  ipInt=$((ipInt + 1))
 done
+
+###############################################################################
+# Testing status
+###############################################################################
+# Tested single-node
+# Tested multi-node
